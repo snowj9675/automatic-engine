@@ -104,7 +104,8 @@ jobs:
       - name: Download Silero when selected
         if: steps.voices.outputs.silero == 'true'
         run: python scripts/download_silero.py
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
+        id: speech_cache
         with:
           path: output/${{ matrix.slug }}/cache
           key: speech-${{ runner.os }}-${{ matrix.slug }}-${{ hashFiles('scripts/render_episode.py') }}-${{ github.sha }}
@@ -142,3 +143,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           EPISODE_ID: ${{ matrix.slug }}
         run: python scripts/publish_index.py "output/$EPISODE_ID"
+      - name: Preserve completed speech turns, including after a failed run
+        if: always() && steps.speech_cache.outcome == 'success' && steps.speech_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: output/${{ matrix.slug }}/cache
+          key: ${{ steps.speech_cache.outputs.cache-primary-key }}

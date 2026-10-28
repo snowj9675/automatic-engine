@@ -93,7 +93,8 @@ async def synthesize(text, voice, rate, directory):
     mp3, meta = directory / f'{key}.mp3', directory / f'{key}.json'
     if mp3.exists() and meta.exists():
         return mp3, json.loads(meta.read_text())
-    for attempt in range(3):
+    retry_delays=(2,5,10,20,40)
+    for attempt in range(len(retry_delays)+1):
         words = []
         try:
             # aiohttp does not automatically read HTTPS_PROXY.
@@ -111,11 +112,13 @@ async def synthesize(text, voice, rate, directory):
             mp3.with_suffix('.tmp').replace(mp3)
             meta.write_text(json.dumps(words, ensure_ascii=False))
             return mp3, words
-        except Exception:
+        except Exception as error:
             mp3.with_suffix('.tmp').unlink(missing_ok=True)
-            if attempt == 2:
+            if attempt == len(retry_delays):
                 raise
-            await asyncio.sleep(attempt + 1)
+            delay=retry_delays[attempt]
+            print(f'Edge {voice}: {type(error).__name__}; retry in {delay}s ({attempt+1}/{len(retry_delays)}).',flush=True)
+            await asyncio.sleep(delay)
 
 
 def font(size):

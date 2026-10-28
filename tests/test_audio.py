@@ -3,12 +3,12 @@ import sys
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 import wave
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'scripts'))
-from render_episode import speech_pcm, synthesize_silero, prepare_speech, edge_rate, mux_video, word_alignment
+from render_episode import speech_pcm, synthesize_silero, prepare_speech, edge_rate, mux_video, word_alignment, synthesize
 
 
 class SpeechAudioTests(unittest.TestCase):
@@ -122,3 +122,22 @@ class WordBoundaryTests(unittest.TestCase):
             word_alignment(text,words,True)
         exact=[{'text':word} for word in text.split()]
         self.assertEqual(word_alignment(text,exact,True),'exact')
+
+
+class EdgeRetryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_empty_responses_retry_without_caching_partial_audio(self):
+        calls=[]
+        class Speech:
+            def __init__(self,*args,**kwargs):calls.append(kwargs)
+            async def stream(self):
+                yield {'type':'audio','data':b'partial' if len(calls)<4 else b'complete'}
+                if len(calls)<4:raise RuntimeError('temporary empty response')
+                yield {'type':'WordBoundary','text':'Hallo','offset':0,'duration':1000000}
+        with tempfile.TemporaryDirectory() as tmp, patch('render_episode.edge_tts.Communicate',Speech), patch('render_episode.asyncio.sleep',new_callable=AsyncMock) as sleep:
+            path,words=await synthesize('Hallo','de-DE-SeraphinaMultilingualNeural','-10%',Path(tmp))
+            self.assertEqual(path.read_bytes(),b'complete')
+            self.assertEqual(len(words),1)
+            self.assertEqual([c.args[0] for c in sleep.await_args_list],[2,5,10])
+            self.assertFalse(list(Path(tmp).glob('*.tmp')))
+            await synthesize('Hallo','de-DE-SeraphinaMultilingualNeural','-10%',Path(tmp))
+            self.assertEqual(len(calls),4)

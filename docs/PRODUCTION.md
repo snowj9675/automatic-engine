@@ -125,7 +125,9 @@ changes rebuild lessons that reference the image. Shared source changes rebuild
 all ready lessons. Manual **Actions → German episode production → Run workflow**
 can target an episode id; blank selects all ready lessons. Explicit short samples
 are checks only and are not stored in R2. Voice models/speech are cached to speed
-reruns. Caches are internal build accelerators, not viewer download artifacts.
+reruns, including completed speech turns from a failed run. Transient Edge
+errors are retried with increasing delays; the voice is never silently replaced.
+Caches are internal build accelerators, not viewer download artifacts.
 
 ## Layout and voices
 
