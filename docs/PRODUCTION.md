@@ -115,8 +115,6 @@ are temporary, so fix configuration errors and rerun the job if needed.
 
 ```bash
 pip install -r requirements.txt
-python -m piper.download_voices --data-dir models de_DE-thorsten-medium
-python scripts/download_silero.py
 python -m unittest discover -s tests -v
 python scripts/discover_episodes.py
 python scripts/produce_episode.py --episode input/cafe-visit-a1.md
@@ -136,7 +134,10 @@ active character, with bold German text and bottom English subtitles. There is
 no top banner or sentence/speed display. This follows the supplied conversation
 reference; the earlier editorial frame and concept image are superseded.
 
-Eva's German model is licensed CC BY-NC-SA 4.0. Obtain appropriate rights or use a
-commercially licensed replacement before monetized use. Model attribution and
-license links are in the README. The pipeline can check intelligibility with the
+The default voices are Edge TTS `de-DE-FlorianMultilingualNeural` (left) and
+`de-DE-SeraphinaMultilingualNeural` (right). They need internet access, with no
+offline model download. `playback_speed: 0.90` and base `rate: +0%` request
+native -10% speech, without a second slowdown. `karaoke: false` preserves
+simple sentence bubbles; real word boundaries are still saved in the timeline.
+Optional older offline voices and their license details remain in the README. The pipeline can check intelligibility with the
 optional ASR audit, but does not promise flawless pronunciation for every script.

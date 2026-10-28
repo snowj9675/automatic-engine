@@ -2,20 +2,20 @@
   "title": "Im Café",
   "level": "A1",
   "translation_language": "English",
-  "rate": "-15%",
+  "rate": "+0%",
   "pause_seconds": 0.65,
   "speakers": {
     "male": {
       "name": "Ben",
-      "voice": "de-DE-ConradNeural",
+      "voice": "de-DE-FlorianMultilingualNeural",
       "piper_voice": "de_DE-thorsten-medium",
-      "engine": "piper"
+      "engine": "edge"
     },
     "female": {
       "name": "Anna",
-      "voice": "de-DE-KatjaNeural",
+      "voice": "de-DE-SeraphinaMultilingualNeural",
       "piper_voice": "de_DE-kerstin-low",
-      "engine": "silero",
+      "engine": "edge",
       "silero_voice": "eva_k"
     }
   },
@@ -81,5 +81,6 @@
       "translation": "Yes. I will wait a little longer."
     }
   ],
-  "playback_speed": 0.9
+  "playback_speed": 0.9,
+  "karaoke": false
 }

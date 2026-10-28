@@ -8,6 +8,19 @@ image: ../images/cafe_two_people.png
 left_name: Ben
 right_name: Anna
 translation_language: English
+rate: +0%
+karaoke: false
+speakers:
+  male:
+    name: Ben
+    position: left
+    engine: edge
+    voice: de-DE-FlorianMultilingualNeural
+  female:
+    name: Anna
+    position: right
+    engine: edge
+    voice: de-DE-SeraphinaMultilingualNeural
 playback_speed: 0.90
 pause_seconds: 0.85
 target_duration_seconds: [480, 600]

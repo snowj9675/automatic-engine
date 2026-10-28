@@ -76,14 +76,34 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
+      - name: Select required speech models
+        id: voices
+        env:
+          EPISODE: ${{ matrix.episode }}
+          ENGINE: ${{ inputs.engine || 'auto' }}
+        run: |
+          python - <<'PYTHON'
+          import os, sys
+          sys.path.insert(0, 'scripts')
+          from episode_package import read_source
+          data=read_source(os.environ['EPISODE'])
+          override=os.environ['ENGINE']
+          engines={p.get('engine','piper') for p in data['speakers'].values()} if override=='auto' else {override}
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+              for engine in ['piper','silero']:
+                  output.write(engine+'='+str(engine in engines).lower()+'\n')
+          PYTHON
       - uses: actions/cache@v4
+        if: steps.voices.outputs.piper == 'true' || steps.voices.outputs.silero == 'true'
         with:
           path: models
           key: german-voices-thorsten-medium-silero-2e22f386-v1
-      - name: Download German voices
-        run: |
-          python -m piper.download_voices --data-dir models de_DE-thorsten-medium de_DE-kerstin-low
-          python scripts/download_silero.py
+      - name: Download Piper voices when selected
+        if: steps.voices.outputs.piper == 'true'
+        run: python -m piper.download_voices --data-dir models de_DE-thorsten-medium de_DE-kerstin-low
+      - name: Download Silero when selected
+        if: steps.voices.outputs.silero == 'true'
+        run: python scripts/download_silero.py
       - uses: actions/cache@v4
         with:
           path: output/${{ matrix.slug }}/cache

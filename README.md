@@ -45,8 +45,6 @@ sudo apt-get install -y ffmpeg fonts-dejavu-core
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m piper.download_voices --data-dir models de_DE-thorsten-medium
-python scripts/download_silero.py
 python -m unittest discover -s tests -v
 python scripts/render_episode.py --sample
 # Optional override: python scripts/render_episode.py --speed 0.90
@@ -60,41 +58,29 @@ turn-taking pauses. Speech plays at 0.90× the previous preview, with pitch pres
 
 ## Voices and timing
 
-Default `--engine auto` uses **Silero v3 German Eva (`eva_k`) for Anna**, producing
-24 kHz native speech resampled to the 48 kHz master, and Piper Thorsten for Ben. Anna's character name remains Anna.
-The previous Kerstin voice and a Ramona candidate performed poorly in the German
-ASR check and are not used for Anna in automatic mode. Voices are selected per
-speaker in the episode JSON, and the timeline records the actual engine/voice.
+Default `--engine auto` uses **Edge TTS FlorianMultilingual for Ben**
+(`de-DE-FlorianMultilingualNeural`) and **SeraphinaMultilingual for Anna**
+(`de-DE-SeraphinaMultilingualNeural`), both German (Germany). Character names
+and screen positions are independent of voice names. The Markdown file can
+set an explicit `speakers` map; new lessons use these voices by default.
 
-Install the CPU dependencies, download both models, and render:
+`playback_speed: 0.90` is sent to Edge as native `rate="-10%"` with the default
+base `rate: +0%`. No second time stretch is applied. Word boundaries remain
+available in the timeline; simple sentence bubbles remain the default. Set
+`karaoke: true` to enable word highlighting. Every turn records its actual
+engine and voice; synthesis failures never substitute an older voice.
 
-```bash
-pip install -r requirements.txt
-python -m piper.download_voices --data-dir models de_DE-thorsten-medium
-python scripts/download_silero.py
-python scripts/render_episode.py
-```
+Edge TTS requires access to Microsoft's online speech service. The workflow
+uses edge-tts 7.3.1 and skips offline voice-model downloads for Edge episodes.
+Speech is cached by text, exact voice, rate and library version.
 
-The Silero downloader verifies a pinned SHA-256. It tries the official model URL
-and a byte-identical mirror; no unverified model is loaded. Models run locally
-after downloading. Anna uses Silero's native speaking cadence with the requested
-0.90× pitch-preserving slowdown. Ben retains the earlier Piper 1.18 duration scale
-and 0.90× playback. The subtitles follow measured audio durations.
-
-**Silero attribution and license:** German v3 model by the
-[Silero Team](https://github.com/snakers4/silero-models), licensed under
-[CC BY-NC-SA 4.0](https://github.com/snakers4/silero-models/blob/master/LICENSE).
-This preview uses Eva's voice and resamples/slows the generated speech. The model
-is noncommercial; obtain appropriate commercial rights before using it in a
-monetized product. Model files are downloaded separately. Piper is GPL-3.0;
-Thorsten's dataset is CC0 according to its
+Piper and Silero remain optional for comparison. If explicitly selecting them,
+download the configured models first. **Silero attribution and license:** German
+v3 model by the [Silero Team](https://github.com/snakers4/silero-models), licensed
+under [CC BY-NC-SA 4.0](https://github.com/snakers4/silero-models/blob/master/LICENSE).
+Historical Eva samples use this noncommercial model. Piper is GPL-3.0; Thorsten's
+dataset is CC0 according to its
 [model card](https://huggingface.co/rhasspy/piper-voices/blob/main/de/de_DE/thorsten/medium/MODEL_CARD).
-
-`--engine piper` explicitly selects the older Piper-only setup; it is retained for
-comparison, not recommended for Anna. Optional `--engine edge` supports real
-word-timestamp karaoke, but returned HTTP 403 in the tested environments and
-remains experimental. Silero/Piper use sentence captions, not estimated karaoke.
-No synthesis error silently changes Anna back to the old voice.
 
 ### Check the voice independently
 
@@ -143,14 +129,9 @@ review new scripts for vocabulary, grammar, pronunciation and translations.
 | Ben | Ist dein Tee heiß? | Is your tea hot? |
 | Anna | Ja. Ich warte noch. | Yes. I will wait a little longer. |
 
-### Female speech stability
+### Audio checks
 
-Anna now uses Silero’s separate 24 kHz synthesis path and native SSML duration
-control for the requested speed. The female voice no longer passes through
-FFmpeg `atempo`. Each new waveform is checked for finite values, given peak
-headroom without hard clipping, and faded for 5 ms at its boundaries. A new
-cache version prevents reuse of the previous female renders.
-
-`audio-quality.json` records per-turn clipping and boundary checks. These
-checks catch technical faults; human listening is still required to judge
-vocoder artifacts and pronunciation.
+All generated speech is processed in floating point, given peak headroom
+without hard clipping, and faded for 5 ms at its boundaries before final
+PCM conversion. `audio-quality.json` records per-turn clipping and boundary
+checks. These technical checks do not certify pronunciation or perceptual quality.

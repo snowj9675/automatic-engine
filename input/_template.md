@@ -7,6 +7,8 @@ image_ready: false
 image: ../images/your-lesson.png
 left_name: Ben
 right_name: Mama
+rate: +0%
+karaoke: false
 playback_speed: 0.90
 pause_seconds: 0.85
 target_duration_seconds: [480, 600]
@@ -20,8 +22,9 @@ Rename this file to match its id, for example cooking-with-mama-a1.md, and chang
 the id to cooking-with-mama-a1. Replace these two sample rows with the complete
 8–10 minute dialogue. Use exactly two people. Keep each A1 row to at most 12
 German words (A2: 18). Each row has the speaker name, German and English text.
-The names correspond to left_name and right_name. Voice defaults are Thorsten
-on the left and Eva on the right. These settings and prompts are data, not code.
+The names correspond to left_name and right_name. Voice defaults are FlorianMultilingual
+on the left and SeraphinaMultilingual on the right, both German (Germany)
+through Edge TTS. These settings and prompts are data, not code.
 
 ## Image prompt
 

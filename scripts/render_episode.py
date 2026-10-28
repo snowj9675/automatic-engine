@@ -43,6 +43,8 @@ def validate(data):
         engine=speaker.get('engine','piper')
         if engine not in {'piper','silero','edge'}:
             raise ValueError('Unsupported speaker engine.')
+        if engine=='edge' and not speaker.get('voice'):
+            raise ValueError('Select an Edge voice.')
         if engine=='silero' and not speaker.get('silero_voice'):
             raise ValueError('Select a Silero voice.')
         if engine=='piper' and key not in {'male','female'} and not speaker.get('piper_voice'):
@@ -64,6 +66,16 @@ def validate(data):
         if len(line['de'].split())>word_limit or '\n' in line['de']:
             raise ValueError(f'Keep each {data["level"]} caption short: at most {word_limit} words, one paragraph.')
     # Structural checks cannot certify CEFR level; scripts require editorial review.
+
+
+def edge_rate(rate, speed):
+    """Combine base prosody and playback speed once, at the speech provider."""
+    if not re.fullmatch(r'[+-]\d+%',rate):
+        raise ValueError('Edge rate must be a signed percentage, for example +0%.')
+    percentage=round((1+int(rate[:-1])/100)*speed*100)-100
+    if percentage<=-100:
+        raise ValueError('Edge rate must produce positive speech speed.')
+    return f'{percentage:+d}%'
 
 
 async def synthesize(text, voice, rate, directory):
@@ -322,15 +334,16 @@ async def build(args):
             mp3, words = synthesize_silero(line['de'], voice_id, cache, args.models, speed)
         elif engine == 'edge':
             voice_id = speaker['voice']
-            mp3, words = await synthesize(line['de'], voice_id, data['rate'], cache)
+            mp3, words = await synthesize(line['de'], voice_id, edge_rate(data.get('rate','+0%'), speed), cache)
         else:
             raise ValueError(f'Unsupported speech engine: {engine}')
         wav = cache / (mp3.stem + f'-48k-{speed:.4f}.wav')
-        prepare_speech(mp3, wav, speed, native_speed=engine == 'silero')
+        prepare_speech(mp3, wav, speed, native_speed=engine in {'silero','edge'})
         with wave.open(str(wav),'rb') as audio:
             pcm = audio.readframes(audio.getnframes())
         duration = len(pcm) / (SR*2)
-        words = [{**w, 'start':w['start']/speed, 'end':w['end']/speed} for w in words]
+        timing_scale = 1. if engine in {'silero','edge'} else speed
+        words = [{**w, 'start':w['start']/timing_scale, 'end':w['end']/timing_scale} for w in words]
         if any(w['start'] < 0 or w['end'] > duration+.1 for w in words):
             raise ValueError('TTS word timing is outside the audio.')
         # Compare word order to avoid highlighting the wrong word silently.
@@ -340,7 +353,8 @@ async def build(args):
         pause_samples = round(data.get('pause_seconds', .65)*SR)
         total = duration + pause_samples/SR
         pcm_parts.append(pcm + bytes(pause_samples*2))
-        events = [(0,-1)] + [(w['start'],i) for i,w in enumerate(words)] + ([(min(words[-1]['end'], duration),-1)] if words else []) + [(total,None)]
+        highlight_words = words if data.get('karaoke',False) else []
+        events = [(0,-1)] + [(w['start'],i) for i,w in enumerate(highlight_words)] + ([(min(highlight_words[-1]['end'], duration),-1)] if highlight_words else []) + [(total,None)]
         for i, ((start, active), (end,_)) in enumerate(zip(events,events[1:])):
             if end <= start:
                 continue
@@ -348,7 +362,7 @@ async def build(args):
             draw_frame(background,data,{**line,'_turn':number,'_total':len(data['lines'])},active,path)
             frame_list += [f"file '{path.as_posix()}'", f'option framerate {SR}', f'duration {end-start:.8f}']
         timeline.append({**line,'tts_engine':engine,'voice_id':voice_id,'start':cursor,'speech_end':cursor+duration,'end':cursor+total,
-                         'audio_processing':SILERO_AUDIO_VERSION if engine == 'silero' else 'atempo',
+                         'audio_processing':SILERO_AUDIO_VERSION if engine == 'silero' else ('edge-native-rate' if engine == 'edge' else 'atempo'),
                          'words':[{**w,'start':w['start']+cursor,'end':w['end']+cursor} for w in words]})
         for entries, text in [(german,line['de']),(translations,line['translation'])]:
             entries.append(f'{number}\n{srt_time(cursor)} --> {srt_time(cursor+total)}\n{text}\n')

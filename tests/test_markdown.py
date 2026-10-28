@@ -44,7 +44,10 @@ Use the same characters.
     def test_single_file_compiles_and_is_discovered(self):
         data,image=load_package(self.path,self.root)
         self.assertEqual(len(data['lines']),2)
-        self.assertEqual(data['speakers']['female']['silero_voice'],'eva_k')
+        self.assertEqual(data['speakers']['female']['voice'],'de-DE-SeraphinaMultilingualNeural')
+        self.assertEqual(data['speakers']['male']['voice'],'de-DE-FlorianMultilingualNeural')
+        self.assertTrue(all(s['engine']=='edge' for s in data['speakers'].values()))
+        self.assertEqual(data['rate'],'+0%')
         self.assertEqual(image,self.root/'images/cafe.png')
         self.assertEqual(select(self.root,['input/cafe-test.md'])[0]['episode'],'input/cafe-test.md')
         self.assertEqual(len(select(self.root,['images/cafe.png'])),1)

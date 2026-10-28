@@ -6,8 +6,8 @@ import re
 import yaml
 
 DEFAULT_SPEAKERS={
-    'male':{'name':'Ben','position':'left','engine':'piper','piper_voice':'de_DE-thorsten-medium','voice':'de-DE-ConradNeural'},
-    'female':{'name':'Anna','position':'right','engine':'silero','silero_voice':'eva_k','piper_voice':'de_DE-kerstin-low','voice':'de-DE-KatjaNeural'},
+    'male':{'name':'Ben','position':'left','engine':'edge','piper_voice':'de_DE-thorsten-medium','voice':'de-DE-FlorianMultilingualNeural'},
+    'female':{'name':'Anna','position':'right','engine':'edge','silero_voice':'eva_k','piper_voice':'de_DE-kerstin-low','voice':'de-DE-SeraphinaMultilingualNeural'},
 }
 
 
@@ -24,7 +24,7 @@ def read_markdown(path):
         raise ValueError('strict_duration must be true or false without quotes.')
     data={**metadata,'ready':metadata['image_ready']}
     data.setdefault('translation_language','English')
-    data.setdefault('rate','-15%')
+    data.setdefault('rate','+0%')
     data.setdefault('playback_speed',.9)
     data.setdefault('pause_seconds',.8)
     speakers=copy.deepcopy(metadata.get('speakers',DEFAULT_SPEAKERS))

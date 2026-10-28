@@ -8,7 +8,7 @@ import wave
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'scripts'))
-from render_episode import speech_pcm, synthesize_silero, prepare_speech
+from render_episode import speech_pcm, synthesize_silero, prepare_speech, edge_rate
 
 
 class SpeechAudioTests(unittest.TestCase):
@@ -74,3 +74,12 @@ class ProcessingTests(unittest.TestCase):
                 self.assertAlmostEqual(duration,1. if native else 1/.9,delta=.03)
                 self.assertLessEqual(int(np.abs(pcm).max()),round(.89*32767))
                 self.assertEqual((pcm[0],pcm[-1]),(0,0))
+
+
+class EdgeRateTests(unittest.TestCase):
+    def test_native_speed_and_explicit_base_rate(self):
+        self.assertEqual(edge_rate('+0%',.9),'-10%')
+        self.assertEqual(edge_rate('+0%',1.),'+0%')
+        self.assertEqual(edge_rate('-10%',.9),'-19%')
+        for rate in ('fast','0.9','-100%'):
+            with self.assertRaises(ValueError):edge_rate(rate,.9)
