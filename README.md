@@ -37,7 +37,7 @@ Open **Actions → German episode production** to download outputs or rerun an
 episode. New generated videos are workflow artifacts rather than automatic Git
 commits. The checked-in `samples/` videos remain reference previews.
 
-## Local generation
+## Local voice test using the original demo
 
 Requires Python 3.12, FFmpeg, and DejaVu Sans fonts. On Ubuntu:
 
@@ -116,8 +116,10 @@ to regenerate voices. Use `--speed` to override the episode's `playback_speed`.
 
 ## Editing the lesson
 
-Edit `episodes/cafe_a1.json`; keep `de`, `translation`, and `speaker` for each turn.
-Use `male` or `female` speaker IDs. Change `translation` to another language and
+Edit `input/<episode-id>/episode.json`; keep `de`, `translation`, and `speaker`
+for each turn. Character ids must match the two configured speakers, with one on
+the left and one on the right. The original `episodes/cafe_a1.json` is retained
+for direct voice tests; the production workflow reads the packages in `input/`. Change `translation` to another language and
 update `translation_language` if desired; font support must cover that language.
 The current script is a deliberately short A1 café conversation: greetings,
 coffee/tea, milk, cake, hunger and hot drinks. It uses present tense, basic questions,
