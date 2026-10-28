@@ -7,11 +7,16 @@
   "speakers": {
     "male": {
       "name": "Ben",
-      "voice": "de-DE-ConradNeural"
+      "voice": "de-DE-ConradNeural",
+      "piper_voice": "de_DE-thorsten-medium",
+      "engine": "piper"
     },
     "female": {
       "name": "Anna",
-      "voice": "de-DE-KatjaNeural"
+      "voice": "de-DE-KatjaNeural",
+      "piper_voice": "de_DE-kerstin-low",
+      "engine": "silero",
+      "silero_voice": "eva_k"
     }
   },
   "lines": [

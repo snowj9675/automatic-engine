@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import wave
 import unicodedata
+from functools import lru_cache
 
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import edge_tts
@@ -170,9 +171,9 @@ def srt_time(seconds):
     return f'{ms//3600000:02}:{ms//60000%60:02}:{ms//1000%60:02},{ms%1000:03}'
 
 
-def synthesize_piper(text, speaker, directory, models):
+def synthesize_piper(text, speaker, directory, models, model=None):
     from piper import PiperVoice, SynthesisConfig
-    model = 'de_DE-thorsten-medium' if speaker == 'male' else 'de_DE-kerstin-low'
+    model = model or ('de_DE-thorsten-medium' if speaker == 'male' else 'de_DE-kerstin-low')
     path = models / (model + '.onnx')
     if not path.exists():
         raise RuntimeError(f'Missing {path}. Run python -m piper.download_voices --data-dir models de_DE-thorsten-medium de_DE-kerstin-low')
@@ -185,6 +186,34 @@ def synthesize_piper(text, speaker, directory, models):
         voice.phonemize = lambda value: [list(unicodedata.normalize('NFC', ''.join(p))) for p in phonemize(value)]
         with wave.open(str(wav), 'wb') as audio:
             voice.synthesize_wav(text, audio, SynthesisConfig(length_scale=1.18))
+    return wav, []
+
+
+@lru_cache(maxsize=1)
+def load_silero(path):
+    import torch
+    from download_silero import verified
+    if not verified(Path(path)):
+        raise RuntimeError('Download the verified model first: python scripts/download_silero.py')
+    torch.set_num_threads(4)
+    return torch.package.PackageImporter(str(path)).load_pickle('tts_models', 'model')
+
+
+def synthesize_silero(text, speaker, directory, models):
+    import torch
+    key = hashlib.sha256(json.dumps([text, 'silero-v3-de', speaker, SR]).encode()).hexdigest()[:20]
+    wav = directory / (key + '.wav')
+    if not wav.exists():
+        model = load_silero(str(models/'silero-v3-de.pt'))
+        if speaker not in model.speakers or speaker == 'random':
+            raise ValueError('Use a fixed, supported Silero speaker.')
+        with torch.inference_mode():
+            audio = model.apply_tts(text=text, speaker=speaker, sample_rate=SR)
+        temporary = wav.with_suffix('.part')
+        with wave.open(str(temporary), 'wb') as output:
+            output.setparams((1, 2, SR, 0, 'NONE', 'not compressed'))
+            output.writeframes((audio.numpy().clip(-1,1)*32767).astype('<i2').tobytes())
+        temporary.replace(wav)
     return wav, []
 
 
@@ -213,10 +242,19 @@ async def build(args):
         combined.setparams((1,2,SR,0,'NONE','not compressed'))
         for number, line in enumerate(data['lines'],1):
             print(f"[{number}/{len(data['lines'])}] {line['speaker']}: {line['de']}", flush=True)
-            if args.engine == 'piper':
-                mp3, words = synthesize_piper(line['de'], line['speaker'], cache, args.models)
+            speaker = data['speakers'][line['speaker']]
+            engine = speaker.get('engine', 'piper') if args.engine == 'auto' else args.engine
+            if engine == 'piper':
+                voice_id = speaker.get('piper_voice')
+                mp3, words = synthesize_piper(line['de'], line['speaker'], cache, args.models, voice_id)
+            elif engine == 'silero':
+                voice_id = speaker['silero_voice']
+                mp3, words = synthesize_silero(line['de'], voice_id, cache, args.models)
+            elif engine == 'edge':
+                voice_id = speaker['voice']
+                mp3, words = await synthesize(line['de'], voice_id, data['rate'], cache)
             else:
-                mp3, words = await synthesize(line['de'], data['speakers'][line['speaker']]['voice'], data['rate'], cache)
+                raise ValueError(f'Unsupported speech engine: {engine}')
             wav = cache / (mp3.stem + f'-48k-{speed:.4f}.wav')
             run(['ffmpeg','-v','error','-y','-i',mp3,'-af',f'atempo={speed}','-ac','1','-ar',SR,'-c:a','pcm_s16le',wav])
             with wave.open(str(wav),'rb') as audio:
@@ -239,7 +277,7 @@ async def build(args):
                 path = frames / f'{number:03}-{i:03}.jpg'
                 draw_frame(background,data,{**line,'_turn':number,'_total':len(data['lines'])},active,path)
                 frame_list += [f"file '{path.as_posix()}'", f'duration {end-start:.8f}']
-            timeline.append({**line,'start':cursor,'speech_end':cursor+duration,'end':cursor+total,
+            timeline.append({**line,'tts_engine':engine,'voice_id':voice_id,'start':cursor,'speech_end':cursor+duration,'end':cursor+total,
                              'words':[{**w,'start':w['start']+cursor,'end':w['end']+cursor} for w in words]})
             for entries, text in [(german,line['de']),(translations,line['translation'])]:
                 entries.append(f'{number}\n{srt_time(cursor)} --> {srt_time(cursor+total)}\n{text}\n')
@@ -263,7 +301,7 @@ if __name__ == '__main__':
     parser.add_argument('--episode', type=Path, default=ROOT/'episodes/cafe_a1.json')
     parser.add_argument('--image', type=Path, default=ROOT/'cafe_two_people.png')
     parser.add_argument('--output', type=Path, default=ROOT/'output/cafe')
-    parser.add_argument('--engine', choices=['edge','piper'], default='piper')
+    parser.add_argument('--engine', choices=['auto','edge','piper'], default='auto')
     parser.add_argument('--models', type=Path, default=ROOT/'models')
     parser.add_argument('--speed', type=float, help='Pitch-preserving speed multiplier; overrides episode playback_speed.')
     parser.add_argument('--sample',action='store_true',help='Render the first four turns.')

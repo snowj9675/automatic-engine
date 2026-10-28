@@ -20,7 +20,7 @@ def verify(folder):
         sample_rate = audio.getframerate()
     for i,line in enumerate(timeline):
         assert line['start'] < line['speech_end'] < line['end']
-        assert episode['engine'] != 'edge' or line['words']
+        assert line.get('tts_engine', episode['engine']) != 'edge' or line['words']
         pcm = samples[round(line['start']*sample_rate):round(line['speech_end']*sample_rate)]
         assert pcm and max(abs(x) for x in pcm) > 100, 'Silent speech turn'
         assert not line['words'] or len(line['words']) == len(line['de'].split())

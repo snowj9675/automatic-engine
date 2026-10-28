@@ -9,8 +9,8 @@ on:
       engine:
         description: Speech engine (Edge requires external service access)
         type: choice
-        options: [piper, edge]
-        default: piper
+        options: [auto, piper, edge]
+        default: auto
   push:
     branches: [main]
     paths: ['scripts/**', 'episodes/**', 'tests/**', 'requirements.txt', '.github/workflows/podcast.yml']
@@ -34,9 +34,11 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - name: Download local German voices
         run: python -m piper.download_voices --data-dir models de_DE-thorsten-medium de_DE-kerstin-low
+      - name: Download verified German female voice
+        run: python scripts/download_silero.py
       - name: Generate real audio and video
         env:
-          ENGINE: ${{ inputs.engine || 'piper' }}
+          ENGINE: ${{ inputs.engine || 'auto' }}
           FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.sample == false }}
         run: |
           if [ "$FULL" = true ]; then

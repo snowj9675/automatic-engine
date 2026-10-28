@@ -16,8 +16,8 @@ visible.
 
 ## Included preview
 
-The checked-in [31-second video](samples/cafe-a1.mp4) and [audio](samples/cafe-a1.mp3)
-contain all 12 turns, rendered with Piper. Local stream/duration checks and a full
+The checked-in [updated video](samples/cafe-a1.mp4) and [audio](samples/cafe-a1.mp3)
+contain all 12 turns, rendered with Eva and Thorsten. Local stream/duration checks and a full
 FFmpeg decode passed. English and German subtitles are also in `samples/`.
 
 ## Generate a sample on GitHub
@@ -37,6 +37,8 @@ sudo apt-get install -y ffmpeg fonts-dejavu-core
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+python -m piper.download_voices --data-dir models de_DE-thorsten-medium
+python scripts/download_silero.py
 python -m unittest discover -s tests -v
 python scripts/render_episode.py --sample
 # Optional override: python scripts/render_episode.py --speed 0.90
@@ -50,33 +52,57 @@ turn-taking pauses. Speech plays at 0.90× the previous preview, with pitch pres
 
 ## Voices and timing
 
-The default is [Piper](https://github.com/OHF-Voice/piper1-gpl), running German
-neural voices locally on CPU: Thorsten (male, medium) and Kerstin (female, low).
-Download once; synthesis then works offline. The female model has lower audio
-fidelity than the male model, so treat this as a functional sample for review.
-Piper captions are synchronized per turn, without estimated word highlighting.
+Default `--engine auto` uses **Silero v3 German Eva (`eva_k`) for Anna**, producing
+48 kHz speech, and Piper Thorsten for Ben. Anna's character name remains Anna.
+The previous Kerstin voice and a Ramona candidate performed poorly in the German
+ASR check and are not used for Anna in automatic mode. Voices are selected per
+speaker in the episode JSON, and the timeline records the actual engine/voice.
+
+Install the CPU dependencies, download both models, and render:
 
 ```bash
-python -m piper.download_voices --data-dir models de_DE-thorsten-medium de_DE-kerstin-low
-python scripts/render_episode.py --sample
+pip install -r requirements.txt
+python -m piper.download_voices --data-dir models de_DE-thorsten-medium
+python scripts/download_silero.py
+python scripts/render_episode.py
 ```
 
-Optional `--engine edge` uses `de-DE-ConradNeural` and `de-DE-KatjaNeural` through
-[edge-tts](https://github.com/rany2/edge-tts). It provides word timestamps for
-karaoke highlighting and uses the episode's `rate` setting. Both local and GitHub
-runner tests returned HTTP 403 with this service; it is experimental and is not
-the default. No API keys are required. Piper uses a fixed 1.18 synthesis duration scale; the episode’s `playback_speed` applies a further pitch-preserving 0.90× slowdown to either engine. Word timestamps are scaled with the audio.
-The workflow offers an engine selector for manual runs.
+The Silero downloader verifies a pinned SHA-256. It tries the official model URL
+and a byte-identical mirror; no unverified model is loaded. Models run locally
+after downloading. Anna uses Silero's native speaking cadence with the requested
+0.90× pitch-preserving slowdown. Ben retains the earlier Piper 1.18 duration scale
+and 0.90× playback. The subtitles follow measured audio durations.
 
-Piper software is GPL-3.0; voice dataset licenses are CC0 according to their
-[Thorsten model card](https://huggingface.co/rhasspy/piper-voices/blob/main/de/de_DE/thorsten/medium/MODEL_CARD)
-and [Kerstin model card](https://huggingface.co/rhasspy/piper-voices/blob/main/de/de_DE/kerstin/low/MODEL_CARD).
-Models are downloaded, not included in this repository.
+**Silero attribution and license:** German v3 model by the
+[Silero Team](https://github.com/snakers4/silero-models), licensed under
+[CC BY-NC-SA 4.0](https://github.com/snakers4/silero-models/blob/master/LICENSE).
+This preview uses Eva's voice and resamples/slows the generated speech. The model
+is noncommercial; obtain appropriate commercial rights before using it in a
+monetized product. Model files are downloaded separately. Piper is GPL-3.0;
+Thorsten's dataset is CC0 according to its
+[model card](https://huggingface.co/rhasspy/piper-voices/blob/main/de/de_DE/thorsten/medium/MODEL_CARD).
 
-Every turn is cached by text, voice and speech settings. Audio is decoded before
-measuring duration; turn offsets use exact PCM sample counts. Edge mode checks
-that returned word tokens match the script. Delete the output cache to regenerate
-voices. Neither mode fabricates speech on a synthesis error.
+`--engine piper` explicitly selects the older Piper-only setup; it is retained for
+comparison, not recommended for Anna. Optional `--engine edge` supports real
+word-timestamp karaoke, but returned HTTP 403 in the tested environments and
+remains experimental. Silero/Piper use sentence captions, not estimated karaoke.
+No synthesis error silently changes Anna back to the old voice.
+
+### Check the voice independently
+
+The included [Anna-only audition](samples/anna-eva.mp3) isolates her six actual
+turns from the rendered video. The [audit report](samples/voice-audit.json) records
+Whisper-small's German transcription without a supplied transcript or prompt.
+This measures word intelligibility; it cannot prove perfect pronunciation,
+accent or naturalness. Human listening is still required.
+
+```bash
+pip install -r requirements-audit.txt
+python scripts/audit_pronunciation.py output/cafe
+```
+
+Every turn is cached by text, voice and synthesis settings. Delete the output cache
+to regenerate voices. Use `--speed` to override the episode's `playback_speed`.
 
 ## Editing the lesson
 

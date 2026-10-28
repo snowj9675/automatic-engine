@@ -1,0 +1,15 @@
+{
+  "test": "Automatic German intelligibility check; human listening still required",
+  "model": "small",
+  "language": "de",
+  "prompt": null,
+  "turns": 6,
+  "voice_ids": [
+    "eva_k"
+  ],
+  "reference": "Gut, danke! Und dir? Ich möchte einen Tee, bitte. Ohne Milch. Und du? Möchtest du auch einen Kuchen? Ich auch. Der Kuchen ist gut! Ja. Ich warte noch.",
+  "transcript": "Gut, danke, und dir! Ich möchte einen Tee, bitte. Ohne Milch. Und du? Möchtest du auch einen Kuchen? Ich auch. Der Kuchen ist gut. Ja, ich warte noch.",
+  "reference_words": 28,
+  "word_errors": 0,
+  "word_error_rate": 0.0
+}
