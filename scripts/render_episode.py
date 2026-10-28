@@ -12,6 +12,7 @@ import wave
 import unicodedata
 from functools import lru_cache
 from itertools import combinations
+from xml.sax.saxutils import escape
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import edge_tts
@@ -221,22 +222,65 @@ def load_silero(path):
     return torch.package.PackageImporter(str(path)).load_pickle('tts_models', 'model')
 
 
-def synthesize_silero(text, speaker, directory, models):
+# Version every acoustic change so Actions cannot reuse an old defective utterance.
+SILERO_AUDIO_VERSION = 'silero-v3-de-24k-native-rate-pcm-v2'
+
+
+def speech_pcm(audio, sample_rate):
+    """Validate floating speech before PCM conversion; preserve peaks with headroom."""
+    import numpy as np
+    values = np.asarray(audio, dtype=np.float64).reshape(-1).copy()
+    if not len(values) or not np.isfinite(values).all():
+        raise ValueError('Speech synthesis returned empty or non-finite audio.')
+    peak = float(np.abs(values).max())
+    if peak < .001:
+        raise ValueError('Speech synthesis returned silent audio.')
+    # Scale the whole turn, rather than flattening any peaks with hard clipping.
+    if peak > .89:
+        values *= .89 / peak
+    # Five milliseconds prevent discontinuities into/out of the inter-turn silence.
+    count = min(round(sample_rate * .005), len(values)//2)
+    if count:
+        ramp = np.linspace(0., 1., count)
+        values[:count] *= ramp
+        values[-count:] *= ramp[::-1]
+    return np.rint(values * 32767).astype('<i2').tobytes()
+
+
+def synthesize_silero(text, speaker, directory, models, speed=1.):
     import torch
-    key = hashlib.sha256(json.dumps([text, 'silero-v3-de', speaker, SR]).encode()).hexdigest()[:20]
+    sample_rate = 24000
+    key = hashlib.sha256(json.dumps([text, SILERO_AUDIO_VERSION, speaker, sample_rate, speed]).encode()).hexdigest()[:20]
     wav = directory / (key + '.wav')
     if not wav.exists():
         model = load_silero(str(models/'silero-v3-de.pt'))
         if speaker not in model.speakers or speaker == 'random':
             raise ValueError('Use a fixed, supported Silero speaker.')
+        # Native phoneme duration control: no second tempo pass on this voice.
+        ssml = f'<speak><prosody rate="{round(speed*100)}%">{escape(text)}</prosody></speak>'
         with torch.inference_mode():
-            audio = model.apply_tts(text=text, speaker=speaker, sample_rate=SR)
+            audio = model.apply_tts(ssml_text=ssml, speaker=speaker, sample_rate=sample_rate)
+        pcm = speech_pcm(audio.numpy(), sample_rate)
         temporary = wav.with_suffix('.part')
         with wave.open(str(temporary), 'wb') as output:
-            output.setparams((1, 2, SR, 0, 'NONE', 'not compressed'))
-            output.writeframes((audio.numpy().clip(-1,1)*32767).astype('<i2').tobytes())
+            output.setparams((1, 2, sample_rate, 0, 'NONE', 'not compressed'))
+            output.writeframes(pcm)
         temporary.replace(wav)
     return wav, []
+
+
+def prepare_speech(source, destination, speed, native_speed=False):
+    """Resample/process in float, then convert with headroom and click-free edges."""
+    import numpy as np
+    filters = f'aresample={SR}:resampler=soxr:precision=28' if native_speed else f'atempo={speed}'
+    floating = subprocess.check_output(['ffmpeg','-v','error','-i',str(source),'-af',filters,
+        '-ac','1','-ar',str(SR),'-c:a','pcm_f32le','-f','f32le','pipe:1'])
+    pcm = speech_pcm(np.frombuffer(floating,dtype='<f4'),SR)
+    temporary = destination.with_suffix('.part')
+    with wave.open(str(temporary),'wb') as output:
+        output.setparams((1,2,SR,0,'NONE','not compressed'))
+        output.writeframes(pcm)
+    temporary.replace(destination)
 
 
 async def build(args):
@@ -275,14 +319,14 @@ async def build(args):
             mp3, words = synthesize_piper(line['de'], line['speaker'], cache, args.models, voice_id)
         elif engine == 'silero':
             voice_id = speaker['silero_voice']
-            mp3, words = synthesize_silero(line['de'], voice_id, cache, args.models)
+            mp3, words = synthesize_silero(line['de'], voice_id, cache, args.models, speed)
         elif engine == 'edge':
             voice_id = speaker['voice']
             mp3, words = await synthesize(line['de'], voice_id, data['rate'], cache)
         else:
             raise ValueError(f'Unsupported speech engine: {engine}')
         wav = cache / (mp3.stem + f'-48k-{speed:.4f}.wav')
-        run(['ffmpeg','-v','error','-y','-i',mp3,'-af',f'atempo={speed}','-ac','1','-ar',SR,'-c:a','pcm_s16le',wav])
+        prepare_speech(mp3, wav, speed, native_speed=engine == 'silero')
         with wave.open(str(wav),'rb') as audio:
             pcm = audio.readframes(audio.getnframes())
         duration = len(pcm) / (SR*2)
@@ -304,6 +348,7 @@ async def build(args):
             draw_frame(background,data,{**line,'_turn':number,'_total':len(data['lines'])},active,path)
             frame_list += [f"file '{path.as_posix()}'", f'option framerate {SR}', f'duration {end-start:.8f}']
         timeline.append({**line,'tts_engine':engine,'voice_id':voice_id,'start':cursor,'speech_end':cursor+duration,'end':cursor+total,
+                         'audio_processing':SILERO_AUDIO_VERSION if engine == 'silero' else 'atempo',
                          'words':[{**w,'start':w['start']+cursor,'end':w['end']+cursor} for w in words]})
         for entries, text in [(german,line['de']),(translations,line['translation'])]:
             entries.append(f'{number}\n{srt_time(cursor)} --> {srt_time(cursor+total)}\n{text}\n')

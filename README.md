@@ -61,7 +61,7 @@ turn-taking pauses. Speech plays at 0.90× the previous preview, with pitch pres
 ## Voices and timing
 
 Default `--engine auto` uses **Silero v3 German Eva (`eva_k`) for Anna**, producing
-48 kHz speech, and Piper Thorsten for Ben. Anna's character name remains Anna.
+24 kHz native speech resampled to the 48 kHz master, and Piper Thorsten for Ben. Anna's character name remains Anna.
 The previous Kerstin voice and a Ramona candidate performed poorly in the German
 ASR check and are not used for Anna in automatic mode. Voices are selected per
 speaker in the episode JSON, and the timeline records the actual engine/voice.
@@ -142,3 +142,15 @@ review new scripts for vocabulary, grammar, pronunciation and translations.
 | Anna | Ich auch. Der Kuchen ist gut! | Me too. The cake is good! |
 | Ben | Ist dein Tee heiß? | Is your tea hot? |
 | Anna | Ja. Ich warte noch. | Yes. I will wait a little longer. |
+
+### Female speech stability
+
+Anna now uses Silero’s separate 24 kHz synthesis path and native SSML duration
+control for the requested speed. The female voice no longer passes through
+FFmpeg `atempo`. Each new waveform is checked for finite values, given peak
+headroom without hard clipping, and faded for 5 ms at its boundaries. A new
+cache version prevents reuse of the previous female renders.
+
+`audio-quality.json` records per-turn clipping and boundary checks. These
+checks catch technical faults; human listening is still required to judge
+vocoder artifacts and pronunciation.

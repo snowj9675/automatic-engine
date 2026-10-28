@@ -14,7 +14,7 @@ from render_episode import build, validate, font, layout
 from verify_output import verify
 
 DELIVERABLES = ['podcast.mp4','podcast.mp3','german.srt','translation.srt','timeline.json',
-                'episode.json','source.json','thumbnail.png','production-report.json']
+                'episode.json','source.json','thumbnail.png','production-report.json','audio-quality.json']
 
 
 def thumbnail(data, image_path, package, destination):
