@@ -8,7 +8,7 @@ import wave
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'scripts'))
-from render_episode import speech_pcm, synthesize_silero, prepare_speech, edge_rate
+from render_episode import speech_pcm, synthesize_silero, prepare_speech, edge_rate, mux_video, word_alignment
 
 
 class SpeechAudioTests(unittest.TestCase):
@@ -83,3 +83,42 @@ class EdgeRateTests(unittest.TestCase):
         self.assertEqual(edge_rate('-10%',.9),'-19%')
         for rate in ('fast','0.9','-100%'):
             with self.assertRaises(ValueError):edge_rate(rate,.9)
+
+
+class VideoTimingTests(unittest.TestCase):
+    def test_irregular_still_durations_cover_the_complete_audio(self):
+        import json
+        import subprocess
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as tmp:
+            folder=Path(tmp)
+            durations=[4.618,4.498,4.546,5.458]
+            total=sum(durations)
+            entries=[]
+            for i,duration in enumerate(durations):
+                image=folder/f'{i}.jpg'
+                Image.new('RGB',(96,54),(i*60,80,100)).save(image)
+                entries += [f"file '{image}'",'option framerate 48000',f'duration {duration:.8f}']
+            entries += [entries[-3],'option framerate 48000']
+            frames=folder/'frames.txt'
+            frames.write_text('\n'.join(entries)+'\n')
+            source=folder/'audio.wav'
+            with wave.open(str(source),'wb') as w:
+                w.setparams((1,2,48000,0,'NONE',''))
+                w.writeframes(bytes(round(total*48000)*2))
+            dest=folder/'video.mp4'
+            mux_video(frames,source,dest,total)
+            probe=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_streams','-of','json',str(dest)]))
+            for stream in probe['streams']:
+                self.assertAlmostEqual(float(stream['duration']),total,delta=.05)
+
+
+class WordBoundaryTests(unittest.TestCase):
+    def test_provider_groups_allow_sentence_captions_but_not_false_karaoke(self):
+        words=[{'text':'Der'},{'text':'Tisch'},{'text':'ist'},{'text':'schön. Hier'},{'text':'ist'},{'text':'Platz.'}]
+        text='Der Tisch ist schön. Hier ist Platz.'
+        self.assertEqual(word_alignment(text,words),'provider-groups')
+        with self.assertRaisesRegex(ValueError,'disable karaoke'):
+            word_alignment(text,words,True)
+        exact=[{'text':word} for word in text.split()]
+        self.assertEqual(word_alignment(text,exact,True),'exact')

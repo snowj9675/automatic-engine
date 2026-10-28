@@ -78,6 +78,16 @@ def edge_rate(rate, speed):
     return f'{percentage:+d}%'
 
 
+def word_alignment(text, words, karaoke=False):
+    normalize=lambda value: re.sub(r'[^\w]','',value).casefold()
+    expected=[normalize(word) for word in text.split()]
+    actual=[normalize(word['text']) for word in words]
+    alignment='exact' if actual==expected else ('provider-groups' if ''.join(actual)==''.join(expected) else 'provider')
+    if karaoke and alignment!='exact':
+        raise ValueError('TTS tokenization differs from script; disable karaoke for sentence captions.')
+    return alignment if words else 'unavailable'
+
+
 async def synthesize(text, voice, rate, directory):
     key = hashlib.sha256(json.dumps([text, voice, rate, edge_tts.__version__]).encode()).hexdigest()[:20]
     mp3, meta = directory / f'{key}.mp3', directory / f'{key}.json'
@@ -295,6 +305,13 @@ def prepare_speech(source, destination, speed, native_speed=False):
     temporary.replace(destination)
 
 
+def mux_video(frames_path, audio_path, video_path, duration):
+    # Convert timestamps before encoding; hold the final frame through the audio.
+    run(['ffmpeg','-v','error','-y','-f','concat','-safe','0','-i',frames_path,'-i',audio_path,
+         '-map','0:v:0','-map','1:a:0','-vf','fps=24,tpad=stop_mode=clone:stop_duration=2','-c:v','libx264','-preset','fast','-crf','21','-pix_fmt','yuv420p',
+         '-r','24','-c:a','aac','-b:a','192k','-t',f'{duration:.8f}','-movflags','+faststart',video_path])
+
+
 async def build(args):
     data = json.loads(args.episode.read_text())
     if args.speed is not None:
@@ -346,10 +363,9 @@ async def build(args):
         words = [{**w, 'start':w['start']/timing_scale, 'end':w['end']/timing_scale} for w in words]
         if any(w['start'] < 0 or w['end'] > duration+.1 for w in words):
             raise ValueError('TTS word timing is outside the audio.')
-        # Compare word order to avoid highlighting the wrong word silently.
-        normalize = lambda s: re.sub(r'[^\w]', '', s).casefold()
-        if words and [normalize(w['text']) for w in words] != [normalize(w) for w in line['de'].split()]:
-            raise ValueError('TTS tokenization differs from script; use sentence captions or adjust script.')
+        # Provider boundary groups need not equal whitespace-delimited script words.
+        # Enforce that stronger mapping only when highlighting individual words.
+        alignment = word_alignment(line['de'], words, data.get('karaoke',False))
         pause_samples = round(data.get('pause_seconds', .65)*SR)
         total = duration + pause_samples/SR
         pcm_parts.append(pcm + bytes(pause_samples*2))
@@ -362,6 +378,7 @@ async def build(args):
             draw_frame(background,data,{**line,'_turn':number,'_total':len(data['lines'])},active,path)
             frame_list += [f"file '{path.as_posix()}'", f'option framerate {SR}', f'duration {end-start:.8f}']
         timeline.append({**line,'tts_engine':engine,'voice_id':voice_id,'start':cursor,'speech_end':cursor+duration,'end':cursor+total,
+                         'word_alignment':alignment,
                          'audio_processing':SILERO_AUDIO_VERSION if engine == 'silero' else ('edge-native-rate' if engine == 'edge' else 'atempo'),
                          'words':[{**w,'start':w['start']+cursor,'end':w['end']+cursor} for w in words]})
         for entries, text in [(german,line['de']),(translations,line['translation'])]:
@@ -376,9 +393,7 @@ async def build(args):
     # concat requires a repeated final image for its last duration.
     frame_list.extend([frame_list[-3],f'option framerate {SR}'])
     (out/'frames.txt').write_text('\n'.join(frame_list)+'\n')
-    run(['ffmpeg','-v','error','-y','-f','concat','-safe','0','-i',out/'frames.txt','-i',out/'podcast.wav',
-         '-map','0:v:0','-map','1:a:0','-c:v','libx264','-preset','fast','-crf','21','-pix_fmt','yuv420p',
-         '-r','24','-c:a','aac','-b:a','192k','-t',f'{cursor:.8f}','-movflags','+faststart',out/'podcast.mp4'])
+    mux_video(out/'frames.txt', out/'podcast.wav', out/'podcast.mp4', cursor)
     run(['ffmpeg','-v','error','-y','-i',out/'podcast.wav','-c:a','libmp3lame','-b:a','192k',out/'podcast.mp3'])
     (out/'german.srt').write_text('\n'.join(german),encoding='utf-8')
     (out/'translation.srt').write_text('\n'.join(translations),encoding='utf-8')

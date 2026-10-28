@@ -24,7 +24,7 @@ def verify(folder):
     quality=[]
     for i,line in enumerate(timeline):
         assert line['start'] < line['speech_end'] < line['end']
-        assert line.get('tts_engine', episode['engine']) != 'edge' or line['words']
+        assert not episode.get('karaoke',False) or line.get('tts_engine', episode['engine']) != 'edge' or line['words']
         pcm = samples[round(line['start']*sample_rate):round(line['speech_end']*sample_rate)]
         peak=max(abs(x) for x in pcm) if pcm else 0
         assert pcm and peak > 100, 'Silent speech turn'
@@ -33,7 +33,7 @@ def verify(folder):
         assert abs(pcm[0]) <= 32 and abs(pcm[-1]) <= 32, f'Non-zero speech boundary in turn {i+1}'
         quality.append({'turn':i+1,'speaker':line['speaker'],'peak_dbfs':round(20*math.log10(peak/32768),2),
                         'clipped_samples':clipped,'first_sample':pcm[0],'last_sample':pcm[-1]})
-        assert not line['words'] or len(line['words']) == len(line['de'].split())
+        assert not episode.get('karaoke',False) or not line['words'] or len(line['words']) == len(line['de'].split())
         if i:
             assert abs(line['start']-timeline[i-1]['end']) < 1e-6
         assert all(line['start'] <= w['start'] < w['end'] <= line['speech_end']+.1 for w in line['words'])

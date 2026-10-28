@@ -42,3 +42,23 @@ escaping, independent speed caches and a real FFmpeg check that native-speed
 audio is not slowed twice. The production verifier now writes per-turn
 `audio-quality.json` and rejects clipped or discontinuous PCM boundaries.
 These tests do not certify perceptual quality or flawless pronunciation.
+
+## Edge Florian / Seraphina trial
+
+The default pair is now `de-DE-FlorianMultilingualNeural` and
+`de-DE-SeraphinaMultilingualNeural`, using edge-tts 7.3.1. A live request to each
+voice returned audio and word boundaries. Native rate -10% implements the
+requested 0.90 speed once, with no second time-stretch pass.
+
+A four-turn preview includes the first male/female exchange, the previously
+reported “Danke, Ben! Guten Appetit!” and a longer female caption. Its 19.12 s
+audio/video passed full verification. Whisper-small, German, no prompt,
+transcribed all 19 words of its three Seraphina turns without word errors.
+This is an intelligibility test, not a perceptual quality certificate.
+
+The trial exposed two integration issues: irregular still-frame durations could
+leave a short final video tail, and a karaoke-only tokenization constraint was
+being applied to sentence captions. Explicit frame-rate conversion with final
+frame hold now covers the measured audio exactly. Provider boundary groups are
+recorded separately from exact whitespace word matches; word highlighting still
+requires an exact match. Both cases have regression coverage.
