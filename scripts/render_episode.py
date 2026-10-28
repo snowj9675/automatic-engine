@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import wave
+import unicodedata
 
 from PIL import Image, ImageDraw, ImageFont
 import edge_tts
@@ -120,7 +121,9 @@ def draw_frame(background, data, line, active, dest):
     for i, row in enumerate(rows):
         text = ' '.join(word for _,word in row)
         d.text(((W-tf.getlength(text))/2, 927+i*32), text, font=tf, fill='white')
-    im.save(dest)
+    im.save(dest, quality=95, subsampling=0)
+    with Image.open(dest) as check:
+        check.load()
 
 
 def srt_time(seconds):
@@ -128,9 +131,28 @@ def srt_time(seconds):
     return f'{ms//3600000:02}:{ms//60000%60:02}:{ms//1000%60:02},{ms%1000:03}'
 
 
+def synthesize_piper(text, speaker, directory, models):
+    from piper import PiperVoice, SynthesisConfig
+    model = 'de_DE-thorsten-medium' if speaker == 'male' else 'de_DE-kerstin-low'
+    path = models / (model + '.onnx')
+    if not path.exists():
+        raise RuntimeError(f'Missing {path}. Run python -m piper.download_voices --data-dir models de_DE-thorsten-medium de_DE-kerstin-low')
+    key = hashlib.sha256((text + model + 'piper-1.3.0-length-1.18-nfc').encode()).hexdigest()[:20]
+    wav = directory / (key + '.wav')
+    if not wav.exists():
+        voice = PiperVoice.load(str(path))
+        # New eSpeak can emit c + combining cedilla; older German models expect ç.
+        phonemize = voice.phonemize
+        voice.phonemize = lambda value: [list(unicodedata.normalize('NFC', ''.join(p))) for p in phonemize(value)]
+        with wave.open(str(wav), 'wb') as audio:
+            voice.synthesize_wav(text, audio, SynthesisConfig(length_scale=1.18))
+    return wav, []
+
+
 async def build(args):
     data = json.loads(args.episode.read_text())
     validate(data)
+    data['engine'] = args.engine
     if args.sample:
         data['lines'] = data['lines'][:4]
     if not shutil.which('ffmpeg'):
@@ -149,8 +171,11 @@ async def build(args):
         combined.setparams((1,2,SR,0,'NONE','not compressed'))
         for number, line in enumerate(data['lines'],1):
             print(f"[{number}/{len(data['lines'])}] {line['speaker']}: {line['de']}", flush=True)
-            mp3, words = await synthesize(line['de'], data['speakers'][line['speaker']]['voice'], data['rate'], cache)
-            wav = cache / (mp3.stem + '.wav')
+            if args.engine == 'piper':
+                mp3, words = synthesize_piper(line['de'], line['speaker'], cache, args.models)
+            else:
+                mp3, words = await synthesize(line['de'], data['speakers'][line['speaker']]['voice'], data['rate'], cache)
+            wav = cache / (mp3.stem + '-48k.wav')
             run(['ffmpeg','-v','error','-y','-i',mp3,'-ac','1','-ar',SR,'-c:a','pcm_s16le',wav])
             with wave.open(str(wav),'rb') as audio:
                 pcm = audio.readframes(audio.getnframes())
@@ -159,16 +184,16 @@ async def build(args):
                 raise ValueError('TTS word timing is outside the audio.')
             # Compare word order to avoid highlighting the wrong word silently.
             normalize = lambda s: re.sub(r'[^\w]', '', s).casefold()
-            if [normalize(w['text']) for w in words] != [normalize(w) for w in line['de'].split()]:
+            if words and [normalize(w['text']) for w in words] != [normalize(w) for w in line['de'].split()]:
                 raise ValueError('TTS tokenization differs from script; use sentence captions or adjust script.')
             pause_samples = round(data.get('pause_seconds', .65)*SR)
             total = duration + pause_samples/SR
             combined.writeframes(pcm + bytes(pause_samples*2))
-            events = [(0,-1)] + [(w['start'],i) for i,w in enumerate(words)] + [(min(words[-1]['end'], duration),-1),(total,None)]
+            events = [(0,-1)] + [(w['start'],i) for i,w in enumerate(words)] + ([(min(words[-1]['end'], duration),-1)] if words else []) + [(total,None)]
             for i, ((start, active), (end,_)) in enumerate(zip(events,events[1:])):
                 if end <= start:
                     continue
-                path = frames / f'{number:03}-{i:03}.png'
+                path = frames / f'{number:03}-{i:03}.jpg'
                 draw_frame(background,data,line,active,path)
                 frame_list += [f"file '{path.as_posix()}'", f'duration {end-start:.8f}']
             timeline.append({**line,'start':cursor,'speech_end':cursor+duration,'end':cursor+total,
@@ -195,5 +220,7 @@ if __name__ == '__main__':
     parser.add_argument('--episode', type=Path, default=ROOT/'episodes/cafe_a1.json')
     parser.add_argument('--image', type=Path, default=ROOT/'cafe_two_people.png')
     parser.add_argument('--output', type=Path, default=ROOT/'output/cafe')
+    parser.add_argument('--engine', choices=['edge','piper'], default='piper')
+    parser.add_argument('--models', type=Path, default=ROOT/'models')
     parser.add_argument('--sample',action='store_true',help='Render the first four turns.')
     asyncio.run(build(parser.parse_args()))

@@ -14,7 +14,7 @@ def verify(folder):
     assert abs(float(probe['format']['duration'])-timeline[-1]['end']) < .15
     for i,line in enumerate(timeline):
         assert line['start'] < line['speech_end'] < line['end']
-        assert len(line['words']) == len(line['de'].split())
+        assert not line['words'] or len(line['words']) == len(line['de'].split())
         if i:
             assert abs(line['start']-timeline[i-1]['end']) < 1e-6
         assert all(line['start'] <= w['start'] < w['end'] <= line['speech_end']+.1 for w in line['words'])

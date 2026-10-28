@@ -6,6 +6,11 @@ on:
         description: Render only the first four turns
         type: boolean
         default: true
+      engine:
+        description: Speech engine (Edge requires external service access)
+        type: choice
+        options: [piper, edge]
+        default: piper
   push:
     branches: ['feat/german-cafe-podcast']
   pull_request:
@@ -26,14 +31,17 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
+      - name: Download local German voices
+        run: python -m piper.download_voices --data-dir models de_DE-thorsten-medium de_DE-kerstin-low
       - name: Generate real audio and video
         env:
+          ENGINE: ${{ inputs.engine || 'piper' }}
           FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.sample == false }}
         run: |
           if [ "$FULL" = true ]; then
-            python scripts/render_episode.py
+            python scripts/render_episode.py --engine "$ENGINE"
           else
-            python scripts/render_episode.py --sample
+            python scripts/render_episode.py --engine "$ENGINE" --sample
           fi
       - name: Verify generated media
         run: python scripts/verify_output.py output/cafe
