@@ -1,0 +1,30 @@
+{
+  "episode_id": "cafe-visit-a1",
+  "source_revision": "a64442d66310fc2489bd869ee0570c032435e723",
+  "build_id": "40674959560-1",
+  "duration_seconds": 521.082625,
+  "published_at": "recovered-existing-delivery",
+  "video_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/a64442d66310fc2489bd869ee0570c032435e723/40674959560-1/podcast.mp4",
+  "audio_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/a64442d66310fc2489bd869ee0570c032435e723/40674959560-1/podcast.mp3",
+  "thumbnail_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/a64442d66310fc2489bd869ee0570c032435e723/40674959560-1/thumbnail.png",
+  "manifest_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/a64442d66310fc2489bd869ee0570c032435e723/40674959560-1/manifest.json",
+  "public_verified": true,
+  "public_checks": [
+    {
+      "method": "HEAD",
+      "status": 200,
+      "length": "23092507",
+      "range": null,
+      "type": "video/mp4",
+      "verified": true
+    },
+    {
+      "method": "GET",
+      "status": 206,
+      "length": "1",
+      "range": "bytes 0-0/23092507",
+      "type": "video/mp4",
+      "verified": true
+    }
+  ]
+}
