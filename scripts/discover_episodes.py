@@ -3,7 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import subprocess
-from episode_package import ROOT, load_package, SLUG
+from episode_package import ROOT, load_package, SLUG, read_source
 
 
 def select(root, changed=None, episode=None):
@@ -12,23 +12,26 @@ def select(root, changed=None, episode=None):
     shared = changed is None or any(p.startswith(('scripts/', 'tests/')) or p in (
         'requirements.txt', '.github/workflows/podcast.yml') for p in changed)
     selected = []
-    for path in sorted((root/'input').glob('*/episode.json')):
-        if path.parent.name.startswith('_'):
+    paths=sorted((root/'input').glob('*.md'))+sorted((root/'input').glob('*/episode.json'))
+    seen=set()
+    for path in paths:
+        if path.stem.startswith('_') or path.parent.name.startswith('_'):
             continue
-        raw = json.loads(path.read_text(encoding='utf-8'))
+        raw=read_source(path)
         if raw.get('ready') is not True:
             continue
-        if episode and path.parent.name != episode:
-            continue
-        affected = shared or episode or any(p.startswith(f'input/{path.parent.name}/') for p in changed)
+        slug=raw.get('id','')
+        if slug in seen:raise ValueError(f'Duplicate episode id: {slug}')
+        seen.add(slug)
+        if episode and slug!=episode:continue
+        source=path.relative_to(root).as_posix()
+        affected=shared or episode or source in changed or (path.suffix=='.json' and any(p.startswith(f'input/{path.parent.name}/') for p in changed))
         if not affected:
-            # A reusable image elsewhere in the repository can affect a package.
-            assets = raw.get('assets', {})
-            affected = any((path.parent/value).resolve().relative_to(root.resolve()).as_posix() in changed
-                           for value in assets.values() if value)
+            assets=raw.get('assets',{})
+            affected=any((path.parent/value).resolve().relative_to(root.resolve()).as_posix() in changed for value in assets.values() if value)
         if affected:
-            data,_ = load_package(path, root)
-            selected.append({'slug': data['id'], 'episode': path.relative_to(root).as_posix()})
+            data,_=load_package(path,root)
+            selected.append({'slug':data['id'],'episode':source})
     if episode and not selected:
         raise ValueError(f'No ready episode found: {episode}')
     return selected

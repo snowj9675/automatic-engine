@@ -202,22 +202,34 @@ def srt_time(seconds):
     return f'{ms//3600000:02}:{ms//60000%60:02}:{ms//1000%60:02},{ms%1000:03}'
 
 
+@lru_cache(maxsize=4)
+def load_piper(path):
+    from piper import PiperVoice
+    from piper.config import PiperConfig
+    import onnxruntime
+    options=onnxruntime.SessionOptions()
+    options.intra_op_num_threads=2
+    options.inter_op_num_threads=1
+    voice=PiperVoice(session=onnxruntime.InferenceSession(path,sess_options=options,providers=['CPUExecutionProvider']),
+                     config=PiperConfig.from_dict(json.loads(Path(path+'.json').read_text())))
+    # Preserve German ç with older phoneme maps.
+    phonemize=voice.phonemize
+    voice.phonemize=lambda value:[list(unicodedata.normalize('NFC',''.join(p))) for p in phonemize(value)]
+    return voice
+
+
 def synthesize_piper(text, speaker, directory, models, model=None):
-    from piper import PiperVoice, SynthesisConfig
-    model = model or ('de_DE-thorsten-medium' if speaker == 'male' else 'de_DE-kerstin-low')
-    path = models / (model + '.onnx')
-    if not path.exists():
-        raise RuntimeError(f'Missing {path}. Run python -m piper.download_voices --data-dir models de_DE-thorsten-medium de_DE-kerstin-low')
-    key = hashlib.sha256((text + model + 'piper-1.3.0-length-1.18-nfc').encode()).hexdigest()[:20]
-    wav = directory / (key + '.wav')
+    from piper import SynthesisConfig
+    model=model or ('de_DE-thorsten-medium' if speaker=='male' else 'de_DE-kerstin-low')
+    path=models/(model+'.onnx')
+    if not path.exists():raise RuntimeError('Download the configured Piper model before rendering.')
+    key=hashlib.sha256((text+model+'piper-1.3.0-length-1.18-nfc').encode()).hexdigest()[:20]
+    wav=directory/(key+'.wav')
     if not wav.exists():
-        voice = PiperVoice.load(str(path))
-        # New eSpeak can emit c + combining cedilla; older German models expect ç.
-        phonemize = voice.phonemize
-        voice.phonemize = lambda value: [list(unicodedata.normalize('NFC', ''.join(p))) for p in phonemize(value)]
-        with wave.open(str(wav), 'wb') as audio:
-            voice.synthesize_wav(text, audio, SynthesisConfig(length_scale=1.18))
-    return wav, []
+        voice=load_piper(str(path))
+        with wave.open(str(wav),'wb') as audio:
+            voice.synthesize_wav(text,audio,SynthesisConfig(length_scale=1.18))
+    return wav,[]
 
 
 @lru_cache(maxsize=1)
@@ -273,54 +285,58 @@ async def build(args):
     timeline, frame_list, german, translations = [], [], [], []
     cursor = .0
     audio_position = 0
-    # Whole timeline is assembled in PCM; subtitle offsets use the same sample counts.
-    with wave.open(str(out/'podcast.wav'), 'wb') as combined:
+    # Finalize the PCM master only after every turn has generated successfully.
+    pcm_parts=[]
+    for number, line in enumerate(data['lines'],1):
+        print(f"[{number}/{len(data['lines'])}] {line['speaker']}: {line['de']}", flush=True)
+        speaker = data['speakers'][line['speaker']]
+        engine = speaker.get('engine', 'piper') if args.engine == 'auto' else args.engine
+        if engine == 'piper':
+            voice_id = speaker.get('piper_voice')
+            mp3, words = synthesize_piper(line['de'], line['speaker'], cache, args.models, voice_id)
+        elif engine == 'silero':
+            voice_id = speaker['silero_voice']
+            mp3, words = synthesize_silero(line['de'], voice_id, cache, args.models)
+        elif engine == 'edge':
+            voice_id = speaker['voice']
+            mp3, words = await synthesize(line['de'], voice_id, data['rate'], cache)
+        else:
+            raise ValueError(f'Unsupported speech engine: {engine}')
+        wav = cache / (mp3.stem + f'-48k-{speed:.4f}.wav')
+        run(['ffmpeg','-v','error','-y','-i',mp3,'-af',f'atempo={speed}','-ac','1','-ar',SR,'-c:a','pcm_s16le',wav])
+        with wave.open(str(wav),'rb') as audio:
+            pcm = audio.readframes(audio.getnframes())
+        duration = len(pcm) / (SR*2)
+        words = [{**w, 'start':w['start']/speed, 'end':w['end']/speed} for w in words]
+        if any(w['start'] < 0 or w['end'] > duration+.1 for w in words):
+            raise ValueError('TTS word timing is outside the audio.')
+        # Compare word order to avoid highlighting the wrong word silently.
+        normalize = lambda s: re.sub(r'[^\w]', '', s).casefold()
+        if words and [normalize(w['text']) for w in words] != [normalize(w) for w in line['de'].split()]:
+            raise ValueError('TTS tokenization differs from script; use sentence captions or adjust script.')
+        pause_samples = round(data.get('pause_seconds', .65)*SR)
+        total = duration + pause_samples/SR
+        pcm_parts.append(pcm + bytes(pause_samples*2))
+        events = [(0,-1)] + [(w['start'],i) for i,w in enumerate(words)] + ([(min(words[-1]['end'], duration),-1)] if words else []) + [(total,None)]
+        for i, ((start, active), (end,_)) in enumerate(zip(events,events[1:])):
+            if end <= start:
+                continue
+            path = frames / f'{number:03}-{i:03}.jpg'
+            draw_frame(background,data,{**line,'_turn':number,'_total':len(data['lines'])},active,path)
+            frame_list += [f"file '{path.as_posix()}'", f'option framerate {SR}', f'duration {end-start:.8f}']
+        timeline.append({**line,'tts_engine':engine,'voice_id':voice_id,'start':cursor,'speech_end':cursor+duration,'end':cursor+total,
+                         'words':[{**w,'start':w['start']+cursor,'end':w['end']+cursor} for w in words]})
+        for entries, text in [(german,line['de']),(translations,line['translation'])]:
+            entries.append(f'{number}\n{srt_time(cursor)} --> {srt_time(cursor+total)}\n{text}\n')
+        audio_position += len(pcm)//2 + pause_samples
+        cursor = audio_position/SR
+    with wave.open(str(out/'podcast.part.wav'),'wb') as combined:
         combined.setparams((1,2,SR,0,'NONE','not compressed'))
-        for number, line in enumerate(data['lines'],1):
-            print(f"[{number}/{len(data['lines'])}] {line['speaker']}: {line['de']}", flush=True)
-            speaker = data['speakers'][line['speaker']]
-            engine = speaker.get('engine', 'piper') if args.engine == 'auto' else args.engine
-            if engine == 'piper':
-                voice_id = speaker.get('piper_voice')
-                mp3, words = synthesize_piper(line['de'], line['speaker'], cache, args.models, voice_id)
-            elif engine == 'silero':
-                voice_id = speaker['silero_voice']
-                mp3, words = synthesize_silero(line['de'], voice_id, cache, args.models)
-            elif engine == 'edge':
-                voice_id = speaker['voice']
-                mp3, words = await synthesize(line['de'], voice_id, data['rate'], cache)
-            else:
-                raise ValueError(f'Unsupported speech engine: {engine}')
-            wav = cache / (mp3.stem + f'-48k-{speed:.4f}.wav')
-            run(['ffmpeg','-v','error','-y','-i',mp3,'-af',f'atempo={speed}','-ac','1','-ar',SR,'-c:a','pcm_s16le',wav])
-            with wave.open(str(wav),'rb') as audio:
-                pcm = audio.readframes(audio.getnframes())
-            duration = len(pcm) / (SR*2)
-            words = [{**w, 'start':w['start']/speed, 'end':w['end']/speed} for w in words]
-            if any(w['start'] < 0 or w['end'] > duration+.1 for w in words):
-                raise ValueError('TTS word timing is outside the audio.')
-            # Compare word order to avoid highlighting the wrong word silently.
-            normalize = lambda s: re.sub(r'[^\w]', '', s).casefold()
-            if words and [normalize(w['text']) for w in words] != [normalize(w) for w in line['de'].split()]:
-                raise ValueError('TTS tokenization differs from script; use sentence captions or adjust script.')
-            pause_samples = round(data.get('pause_seconds', .65)*SR)
-            total = duration + pause_samples/SR
-            combined.writeframes(pcm + bytes(pause_samples*2))
-            events = [(0,-1)] + [(w['start'],i) for i,w in enumerate(words)] + ([(min(words[-1]['end'], duration),-1)] if words else []) + [(total,None)]
-            for i, ((start, active), (end,_)) in enumerate(zip(events,events[1:])):
-                if end <= start:
-                    continue
-                path = frames / f'{number:03}-{i:03}.jpg'
-                draw_frame(background,data,{**line,'_turn':number,'_total':len(data['lines'])},active,path)
-                frame_list += [f"file '{path.as_posix()}'", f'duration {end-start:.8f}']
-            timeline.append({**line,'tts_engine':engine,'voice_id':voice_id,'start':cursor,'speech_end':cursor+duration,'end':cursor+total,
-                             'words':[{**w,'start':w['start']+cursor,'end':w['end']+cursor} for w in words]})
-            for entries, text in [(german,line['de']),(translations,line['translation'])]:
-                entries.append(f'{number}\n{srt_time(cursor)} --> {srt_time(cursor+total)}\n{text}\n')
-            audio_position += len(pcm)//2 + pause_samples
-            cursor = audio_position/SR
+        combined.writeframes(b''.join(pcm_parts))
+    pcm_parts.clear()
+    (out/'podcast.part.wav').replace(out/'podcast.wav')
     # concat requires a repeated final image for its last duration.
-    frame_list.append(frame_list[-2])
+    frame_list.extend([frame_list[-3],f'option framerate {SR}'])
     (out/'frames.txt').write_text('\n'.join(frame_list)+'\n')
     run(['ffmpeg','-v','error','-y','-f','concat','-safe','0','-i',out/'frames.txt','-i',out/'podcast.wav',
          '-map','0:v:0','-map','1:a:0','-c:v','libx264','-preset','fast','-crf','21','-pix_fmt','yuv420p',

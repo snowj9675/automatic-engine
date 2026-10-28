@@ -18,13 +18,21 @@ def asset_path(package, value, root=ROOT):
     return candidate
 
 
+def read_source(path):
+    if Path(path).suffix=='.md':
+        from markdown_episode import read_markdown
+        return read_markdown(path)
+    return json.loads(Path(path).read_text(encoding='utf-8'))
+
+
 def load_package(path, root=ROOT, require_ready=True):
     path = Path(path).resolve()
     if not path.is_relative_to(root.resolve()):
         raise ValueError('Episode must be inside the repository.')
-    data = json.loads(path.read_text(encoding='utf-8'))
+    data = read_source(path)
     slug = data.get('id', '')
-    if not SLUG.fullmatch(slug) or slug != path.parent.name:
+    expected=path.stem if path.suffix=='.md' else path.parent.name
+    if not SLUG.fullmatch(slug) or slug != expected:
         raise ValueError('Episode id must match its folder: lowercase words joined by hyphens.')
     if require_ready and data.get('ready') is not True:
         raise ValueError('Episode is a draft. Set ready to true when script and image are complete.')

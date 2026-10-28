@@ -22,20 +22,18 @@ FFmpeg decode passed. English and German subtitles are also in `samples/`.
 
 ## Episode production
 
-Put each lesson in `input/<episode-id>/` with `episode.json`, your background
-image and `prompts.md`. Set `ready: true` after the script and image are complete.
-A commit on `main` renders the full episode; pull requests use a four-turn preview.
-A1 and A2, arbitrary two-character names, speed, pauses, thumbnail artwork and
-duration targets are supported. Optional R2 upload activates when all four R2
-secrets are configured. GitHub artifacts remain available without R2.
+Write one lesson as `input/<episode-id>.md`. Its YAML settings contain image_ready,
+image path, level, voices, speed and duration target; the body contains dialogue,
+translations and artwork prompts. The pipeline creates its internal JSON files.
 
-**[Production guide and R2 setup](docs/PRODUCTION.md)** ·
-**[Working episode](input/cafe-a1-demo/episode.json)** ·
-**[Draft template](input/_template/episode.json)**
+With `image_ready: false`, the lesson waits. Upload its image into `images/`, set
+`image_ready: true` and commit to render the complete lesson and publish it to R2.
+GitHub artifact uploads are disabled. Verified public links are saved in
+`published/<episode-id>.json`.
 
-Open **Actions → German episode production** to download outputs or rerun an
-episode. New generated videos are workflow artifacts rather than automatic Git
-commits. The checked-in `samples/` videos remain reference previews.
+**[Production guide and secret names](docs/PRODUCTION.md)** ·
+**[Long café script](input/cafe-visit-a1.md)** ·
+**[Single-file template](input/_template.md)**
 
 ## Local voice test using the original demo
 
@@ -116,10 +114,10 @@ to regenerate voices. Use `--speed` to override the episode's `playback_speed`.
 
 ## Editing the lesson
 
-Edit `input/<episode-id>/episode.json`; keep `de`, `translation`, and `speaker`
-for each turn. Character ids must match the two configured speakers, with one on
-the left and one on the right. The original `episodes/cafe_a1.json` is retained
-for direct voice tests; the production workflow reads the packages in `input/`. Change `translation` to another language and
+Edit the dialogue table in `input/<episode-id>.md`; keep Speaker, German and
+English columns. Speaker names must match the two characters in the settings,
+with one on the left and one on the right. The original `episodes/cafe_a1.json` is retained
+for direct voice tests; the production workflow reads Markdown lessons in `input/`. Change `translation` to another language and
 update `translation_language` if desired; font support must cover that language.
 The current script is a deliberately short A1 café conversation: greetings,
 coffee/tea, milk, cake, hunger and hot drinks. It uses present tense, basic questions,

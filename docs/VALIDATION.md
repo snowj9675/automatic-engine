@@ -1,14 +1,17 @@
-# Production pipeline validation
+# Pipeline validation
 
-- 15 unit/integration tests passed: episode detection, shared artwork changes,
-  draft handling, A2 named characters, asset boundaries, R2 configuration,
-  file tampering, preview skipping, upload failure and manifest-last ordering.
-- The complete 12-turn café package rendered and passed stream, non-silent audio,
-  timing and full FFmpeg decoding checks; the fallback thumbnail was inspected.
-- A **548.39-second (9:08) duration test** rendered 192 caption turns and passed
-  the same media checks. It repeated the reference dialogue purely to test the
-  renderer at lesson length; it is not an authored lesson or a delivered episode.
-- R2 upload tests used a storage double. No live bucket upload was performed;
-  real credential/bucket verification is pending setup.
-- A1/A2 validation checks structure and caption length, not language proficiency
-  or perfect pronunciation. Script editing and listening review remain necessary.
+- 22 tests pass, covering Markdown compilation, image_ready Booleans, missing
+  artwork, named speakers, A2, discovery, R2 secret aliases, bucket endpoint
+  normalization, public-link metadata, credential exclusion and transfer failures.
+- The authored café lesson has 153 turns and renders locally to **516.81 seconds
+  (8:37)**. Both encoded streams, every non-silent spoken turn, subtitle/timeline
+  alignment and full FFmpeg decoding pass. Its strict 480–600 second target passes.
+- The still-image concat clock now uses the audio sample timebase to prevent
+  cumulative caption drift. The PCM master is finalized after all turns succeed.
+- GitHub artifact upload steps are removed. The live workflow uses the configured
+  R2 secrets, checks uploaded sizes and public video access, and only then writes
+  intended-public links to published/<episode-id>.json. The publication index is
+  the source of truth for completed live deliveries.
+- An earlier 548.39-second renderer stress test used repeated sample dialogue;
+  it is not the authored café lesson now being published.
+- Structural/ASR checks do not certify CEFR proficiency or flawless pronunciation.

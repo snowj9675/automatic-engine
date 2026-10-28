@@ -5,26 +5,58 @@ import json
 import os
 from pathlib import Path
 import re
+import time
+from datetime import datetime, timezone
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 KEYS=('R2_ACCOUNT_ID','R2_ACCESS_KEY_ID','R2_SECRET_ACCESS_KEY','R2_BUCKET_NAME')
 
 
 def settings(env):
+    new_keys=('ACCESS_KEY_ID','SECRET_ACCESS_KEY','BUCKET_NAME','S3_API','PUBLIC_URL')
+    if any(env.get(key) for key in new_keys):
+        missing=[key for key in new_keys if not env.get(key)]
+        if missing:raise ValueError('Missing R2 settings: '+', '.join(missing))
+        endpoint=env['S3_API'].strip().rstrip('/')
+        if '://' not in endpoint:endpoint='https://'+endpoint
+        parts=urlsplit(endpoint)
+        if parts.scheme!='https' or parts.username or parts.password or parts.port or parts.query or parts.fragment or not re.fullmatch(r'[a-fA-F0-9]{32}(?:\.[a-z0-9-]+)?\.r2\.cloudflarestorage\.com',parts.hostname or ''):
+            raise ValueError('S3_API must be your HTTPS Cloudflare R2 S3 endpoint.')
+        if parts.path.strip('/') not in ('',env['BUCKET_NAME']):
+            raise ValueError('S3_API may end in the configured bucket name, but no other path.')
+        public=env['PUBLIC_URL'].strip().rstrip('/')
+        pp=urlsplit(public)
+        if pp.scheme!='https' or not pp.hostname or pp.username or pp.password or pp.query or pp.fragment:
+            raise ValueError('PUBLIC_URL must be the HTTPS public bucket/domain base URL.')
+        return {'R2_ACCESS_KEY_ID':env['ACCESS_KEY_ID'],'R2_SECRET_ACCESS_KEY':env['SECRET_ACCESS_KEY'],
+                'R2_BUCKET_NAME':env['BUCKET_NAME'],'endpoint_url':f'https://{parts.netloc}', 'public_url':public}
     configured=[bool(env.get(key)) for key in KEYS]
-    if not any(configured):
-        return None
-    if not all(configured):
-        raise ValueError('R2 is partially configured. Set all four R2 secrets or remove them to use GitHub artifacts only.')
-    if not re.fullmatch(r'[a-fA-F0-9]{32}',env['R2_ACCOUNT_ID']):
-        raise ValueError('R2_ACCOUNT_ID must be the 32-character Cloudflare account id.')
-    return {key:env[key] for key in KEYS}
+    if not any(configured):return None
+    if not all(configured):raise ValueError('R2 is partially configured. Set all required R2 secrets.')
+    if not re.fullmatch(r'[a-fA-F0-9]{32}',env['R2_ACCOUNT_ID']):raise ValueError('R2_ACCOUNT_ID must be a Cloudflare account id.')
+    return {**{key:env[key] for key in KEYS},'endpoint_url':f"https://{env['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
+            'public_url':env.get('R2_PUBLIC_BASE_URL','').rstrip('/')}
+
+
+def check_public_video(url, expected_size):
+    for attempt in range(3):
+        try:
+            with urlopen(Request(url,method='HEAD'),timeout=20) as response:
+                if int(response.headers.get('Content-Length','0'))!=expected_size:
+                    raise ValueError('Public video size differs from uploaded file.')
+                if response.status!=200:raise ValueError('Public video is not readable.')
+            return
+        except Exception:
+            if attempt==2:raise RuntimeError('R2 transfer succeeded but the public video check failed. Check PUBLIC_URL and bucket public access.') from None
+            time.sleep(attempt+1)
 
 
 def upload(folder,env=None,client=None):
     env=os.environ if env is None else env
     config=settings(env)
     if config is None:
-        print('R2 is not configured; deliverables remain available as GitHub artifacts.')
+        print('R2 is not configured; generated files remain on the runner. Artifact upload is disabled.')
         return None
     manifest=json.loads((folder/'manifest.json').read_text())
     slug,revision=manifest['id'],manifest['revision']
@@ -46,7 +78,7 @@ def upload(folder,env=None,client=None):
     if client is None:
         import boto3
         from botocore.config import Config
-        client=boto3.client('s3',endpoint_url=f"https://{config['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
+        client=boto3.client('s3',endpoint_url=config['endpoint_url'],
                             aws_access_key_id=config['R2_ACCESS_KEY_ID'],aws_secret_access_key=config['R2_SECRET_ACCESS_KEY'],
                             region_name='auto',config=Config(request_checksum_calculation='when_required',response_checksum_validation='when_required'))
     bucket=config['R2_BUCKET_NAME']
@@ -62,11 +94,18 @@ def upload(folder,env=None,client=None):
         if remote['ContentLength']!=path.stat().st_size:
             raise RuntimeError('R2 object size differs from local deliverable.')
     report={'bucket':bucket,'prefix':prefix,'manifest_key':f'{prefix}/manifest.json'}
-    public=env.get('R2_PUBLIC_BASE_URL','').rstrip('/')
+    public=config.get('public_url','')
     if public:
         report['video_url']=f'{public}/{prefix}/podcast.mp4'
+        check_public_video(report['video_url'],(folder/'podcast.mp4').stat().st_size)
+        publication={'episode_id':slug,'source_revision':revision,'build_id':build_id,
+                     'duration_seconds':manifest['duration_seconds'],
+                     'published_at':datetime.now(timezone.utc).isoformat(),
+                     'video_url':report['video_url'],'audio_url':f'{public}/{prefix}/podcast.mp3',
+                     'thumbnail_url':f'{public}/{prefix}/thumbnail.png','manifest_url':f'{public}/{prefix}/manifest.json'}
+        (folder/'publication.json').write_text(json.dumps(publication,indent=2)+'\n')
     (folder/'r2-upload.json').write_text(json.dumps(report,indent=2)+'\n')
-    print(f'Uploaded complete episode to R2: {prefix}')
+    print(f'Uploaded and verified complete episode in R2: {prefix}')
     return report
 
 

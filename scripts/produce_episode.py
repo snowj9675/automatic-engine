@@ -40,13 +40,19 @@ async def produce(path, sample=False, engine='auto'):
     data,image = load_package(path)
     validate(data)
     output=ROOT/'output'/data['id']
-    await build(SimpleNamespace(episode=path,image=image,output=output,models=ROOT/'models',
+    output.mkdir(parents=True,exist_ok=True)
+    compiled=output/'compiled.json'
+    compiled.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    await build(SimpleNamespace(episode=compiled,image=image,output=output,models=ROOT/'models',
                                 sample=sample,engine=engine,speed=None))
     verify(output)
-    shutil.copyfile(path,output/'source.json')
+    (output/'source.json').write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     prompts=path.parent/'prompts.md'
     files=list(DELIVERABLES)
-    if prompts.exists():
+    if path.suffix=='.md':
+        shutil.copyfile(path,output/'source.md')
+        files.append('source.md')
+    elif prompts.exists():
         shutil.copyfile(prompts,output/'prompts.md')
         files.append('prompts.md')
     thumbnail(data,image,path.parent,output/'thumbnail.png')
@@ -60,6 +66,8 @@ async def produce(path, sample=False, engine='auto'):
     if on_target is False:
         print('Duration is outside the requested range; revise the script after reviewing production-report.json.',flush=True)
     (output/'production-report.json').write_text(json.dumps(report,indent=2)+'\n')
+    if on_target is False and data.get('strict_duration') is True:
+        raise ValueError('Episode is outside the required duration range. See production-report.json.')
     revision=os.getenv('GITHUB_SHA') or 'local'
     manifest={'id':data['id'],'revision':revision,'sample':sample,'duration_seconds':duration,'files':[]}
     for name in files:

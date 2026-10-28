@@ -1,186 +1,140 @@
-# Two-person German episode workflow
+# One Markdown file per German lesson
 
-One folder is one episode. Keep the script, artwork references and prompts together.
-The GitHub workflow discovers ready packages under `input/` and renders complete
-episodes on `main`. It uses a four-turn preview for pull requests. The existing
-`samples/` files remain reference previews; new output is delivered as workflow
-artifacts and optionally to R2, without committing large generated videos to Git.
+The input format is now **one `.md` file**, with YAML settings at the top and a
+German/English dialogue table below. JSON files and manifests are compiled
+internally into the runner's output folder; you do not maintain them by hand.
+Finished videos go to R2. **GitHub artifact uploads are disabled.**
 
-## Your normal process
+## The normal process
 
-1. Ask for an **A1 or A2 episode package**, with the topic, two characters,
-   translation language and an 8–10 minute target. The package should contain the
-   full `episode.json` and a `prompts.md` with scene and thumbnail prompts.
-2. Put those files in `input/<episode-id>/`. Keep `ready: false` while preparing
-   the image. Use a lowercase folder/id such as `cooking-with-mama-a1`.
-3. Generate the scene using the supplied prompt. Upload it into that same folder
-   as `background.png`. The two people must match the script's left/right positions.
-4. Optionally generate a custom thumbnail. Save it as `thumbnail.png` and add
-   `"thumbnail": "thumbnail.png"` inside the `assets` object. If omitted, the
-   pipeline makes a titled cover from the background.
-5. Set `ready: true` and commit. **Actions → German episode production** will
-   render the full video, verify it, and provide a download for that episode.
+1. Ask for a complete A1/A2 Markdown lesson. Save it as `input/<id>.md`, with the
+   same `id` in its top settings. A draft template is in `input/_template.md`.
+2. Read its scene prompt and generate the image. Upload that image into `images/`
+   and set `image` to its relative path, e.g. `../images/kitchen.png`.
+3. Keep `image_ready: false` while the image is missing. The workflow will wait.
+4. Set `image_ready: true` and commit. The workflow validates the image and script,
+   generates the entire video, verifies it, uploads it to R2 and checks public access.
+5. Open `published/<id>.json` for the public video, audio, thumbnail and manifest
+   links. These index files contain only intended-public delivery metadata.
 
-You can commit all files together, or add the script first and images later.
-Draft packages are skipped. A ready package with missing assets fails clearly.
-The bundled `input/cafe-a1-demo/` is a short working example. `input/_template/`
-is a draft blueprint: copy it to your chosen id and change its `id` to match.
-The `input/_template/` folder itself is intentionally ignored.
+The real long café lesson is `input/cafe-visit-a1.md`, using the existing image at
+`images/cafe_two_people.png`. It has original continuous dialogue, not repeated
+sample loops. The older folder/JSON format remains readable for compatibility,
+but input examples now use Markdown exclusively.
 
-## Package files
+## Settings example
 
-| File | Purpose |
-|---|---|
-| `episode.json` | German lines, translations, voices, character names, positions and playback settings |
-| `background.png` | Your generated scene, with exactly two people and no captions |
-| `prompts.md` | Scene prompt, thumbnail prompt, character continuity notes and lesson brief |
-| `thumbnail.png` | Optional custom cover; used as supplied and resized to 1280×720 |
-
-Artwork can also be reused from another location in the repository by changing
-`assets.background`. Relative paths are resolved from the episode folder; assets
-outside the repository are rejected. Updating a shared image rebuilds affected
-ready packages. Normal use is simplest with the image beside the script.
-
-## Supported script instructions
-
-These are declarative JSON settings, not shell commands or executable hooks.
-Do not put API keys or R2 credentials in an episode file.
-
-| Field | Example | Meaning |
-|---|---|---|
-| `id` | `cooking-with-mama-a1` | Must match the folder name |
-| `ready` | `false` then `true` | Controls when generation starts |
-| `title` | `Kochen mit Mama` | Episode title |
-| `display_title` | `In der Küche` | Optional shorter title for the video header |
-| `level` | `A1` or `A2` | Lesson label and caption-length limits |
-| `playback_speed` | `0.90` | Pitch-preserving playback multiplier |
-| `pause_seconds` | `0.65` | Pause between caption turns |
-| `target_duration_seconds` | `[480, 600]` | Desired 8–10 minutes; actual duration appears in the report |
-| `thumbnail_title` | `Kochen mit Mama` | Title for the automatic fallback cover |
-| `assets.background` | `background.png` | Required scene image |
-| `assets.thumbnail` | `thumbnail.png` | Optional custom thumbnail |
-| `speakers.<id>.position` | `left` or `right` | One character on each side; controls the bubble tail |
-| `speakers.<id>.name` | `Mama` | Visible character name |
-| `speakers.<id>.engine` | `silero` or `piper` | Speech engine for that character |
-| `speakers.<id>.silero_voice` | `eva_k` | Tested German female voice |
-| `speakers.<id>.piper_voice` | `de_DE-thorsten-medium` | Tested German male voice |
-| `lines[].speaker` | `mother` | Must match one of the two speaker ids |
-| `lines[].de` | `Was kochen wir heute?` | German caption and speech |
-| `lines[].translation` | `What are we cooking today?` | Bottom subtitle |
-
-Exactly two characters are required, but their ids/names need not be `male` and
-`female`. For example use `mother` and `son`, assign positions, and select voices.
-Only Eva and Thorsten have been tested here; a different voice requires its model
-and listening review. An image cannot make a voice sound younger or older.
-
-A1 captions allow at most 12 German words; A2 allows 18. These are layout limits,
-not CEFR certification. Break longer speeches into short caption turns from the
-same speaker. The script writer must review grammar, vocabulary and translation.
-The level badge now follows the episode instead of being fixed to A1.
-
-## Writing an 8–10 minute lesson
-
-Build a small story rather than a long list of questions. For cooking: deciding
-what to eat → finding ingredients → washing and cutting → cooking → tasting →
-eating and cleaning up. Keep exactly two speaking characters. Recycle useful
-phrases naturally as the task changes, with brief reactions and questions.
-
-There is no single word count that guarantees ten minutes. Voice, punctuation,
-speed and pauses all affect duration. Generate a draft, read
-`production-report.json`, and revise the dialogue if necessary. A target miss is
-reported; the system does not pad silence or repeat the script to force the length.
-The short café demonstration intentionally uses a 25–60 second target.
-
-## Deliverables
-
-Each episode download contains:
-
-- `podcast.mp4`, `podcast.mp3`, and `thumbnail.png`;
-- German and translated SRT files;
-- resolved `episode.json`, original `source.json`, and optional `prompts.md`;
-- `timeline.json` with real turn/word timing where supported;
-- `production-report.json` with measured duration and target comparison;
-- `manifest.json` with the commit revision, file sizes and SHA-256 hashes;
-- `r2-upload.json` when a complete upload succeeds.
-
-A local WAV master and synthesis cache remain in the output folder, but are not
-included in the R2 delivery manifest. The thumbnail is either your custom artwork
-or a deterministic cover from the background; this pipeline does not call an
-image-generation service.
-
-## Optional R2 storage
-
-Create your bucket and an R2 S3 credential with access to that bucket, then add
-these **GitHub repository Actions secrets**:
-
-| Secret | Value |
-|---|---|
-| `R2_ACCOUNT_ID` | Your 32-character Cloudflare account id |
-| `R2_ACCESS_KEY_ID` | R2 S3 access key id |
-| `R2_SECRET_ACCESS_KEY` | R2 S3 secret access key |
-| `R2_BUCKET_NAME` | Existing destination bucket |
-
-No credentials: upload is skipped and GitHub artifacts remain available for
-30 days. Partial credentials: the job reports a configuration error. With all
-four credentials, a complete main-branch render uploads its deliverables under:
-
-`episodes/<episode-id>/<git-commit-sha>/<run-id>-<attempt>/`
-
-The manifest is published last, after file transfers and size checks, so it acts
-as the completion marker. Each run has its own version, including reruns of the same commit; no mutable `latest`
-pointer is maintained. R2 upload is never performed for pull requests or short
-sample renders. A failed upload fails the job, while the verified GitHub artifact
-is still retained. Real R2 transfer testing remains pending until credentials are
-supplied; local tests use a storage double and make no cloud writes.
-
-Optionally set a repository **variable** `R2_PUBLIC_BASE_URL` to an already
-configured public bucket domain. The upload report can then include a video URL.
-Setting this variable does not make a private bucket public. Without a public
-domain, the report gives the bucket/object keys for private access.
-
-References: [Cloudflare R2 boto3 examples](https://developers.cloudflare.com/r2/examples/aws/boto3/)
-and [S3 API setup](https://developers.cloudflare.com/r2/get-started/s3/).
-
-## Manual rendering and reruns
-
-```bash
-python scripts/discover_episodes.py
-python scripts/produce_episode.py --episode input/cafe-a1-demo/episode.json
-python scripts/produce_episode.py --episode input/cafe-a1-demo/episode.json --sample
-python scripts/upload_r2.py output/cafe-a1-demo
+```yaml
+---
+id: cafe-visit-a1
+title: Ein Vormittag im Café
+display_title: Im Café
+level: A1
+image_ready: true
+image: ../images/cafe_two_people.png
+left_name: Ben
+right_name: Anna
+translation_language: English
+playback_speed: 0.90
+pause_seconds: 0.85
+target_duration_seconds: [480, 600]
+strict_duration: true
+thumbnail_title: Im Café · Deutsch A1
+---
 ```
 
-For local R2 uploads, set `GITHUB_SHA` to the committed source revision before
-rendering. Local manifests marked `local` are deliberately rejected for upload.
-On GitHub, **Run workflow** accepts an episode id; blank selects all ready
-packages. Source/renderer changes rebuild all ready packages; episode edits
-rebuild only affected packages. Each job has its own output/artifact and a
-60-minute timeout. Voice models and per-turn speech are cached between runs.
+`image_ready` must be a Boolean, without quotation marks. True requires an existing
+image inside the repository; false skips rendering and publication. Images are
+not generated automatically. Paths are relative to the Markdown file. For an
+optional finished cover, add `thumbnail: ../images/cafe-cover.png`; otherwise a
+cover is made from the background and thumbnail_title.
 
-## Layout direction
+`strict_duration: true` stops publication if measured duration is outside the
+specified range. The pipeline never pads silence or repeats dialogue to force a
+length. Revise the script or pacing if a draft misses its target. Its duration
+report remains available on the runner for diagnosis.
 
-![Proposed 16:9 composition; not the default renderer](layout-concept-16x9.jpg)
+## Dialogue
 
-Keep the current warm palette, character illustration, speaker names and bottom
-translation strip. Suggested next visual iteration, in priority order:
+Use this exact section title and a three-column table:
 
-1. Test a proper 16:9 composition with compact speech bubbles closer to each
-   person's face, keeping both faces unobstructed and subtitles in a safe band.
-2. Add a subtle active-speaker outline and a short bubble transition. Avoid
-   blinking, constant zooming, or motion behind text during long lessons.
-3. Make German text the strongest visual element; keep the English subtitle
-   smaller but readable on a phone. Test A2's longer sentences before shrinking text.
-4. Add optional short chapter cards and a closing vocabulary recap. These are
-   proposed presentation features, not implemented pipeline commands yet.
+```markdown
+## Dialogue
 
-The current approved layout remains the default. A 16:9 redesign deserves a
-separate visual preview before replacing it. Word karaoke should only be enabled
-with trustworthy timings; Eva currently uses synchronized sentence captions.
+| Speaker | German | English |
+|---|---|---|
+| Ben | Ich möchte einen Kaffee. | I would like a coffee. |
+| Anna | Mit Milch oder ohne Milch? | With milk or without milk? |
+```
 
-## Voice licensing before commercial release
+Speaker names must match the two names in the settings. Default voices are
+Thorsten (left, Piper) and Eva (right, Silero). Optional explicit `speakers`
+settings can override voice/position details for advanced use. Keep each A1
+caption to 12 German words, A2 to 18. These are layout limits, not automatic CEFR
+certification. Grammar, vocabulary, translation and pronunciation still need
+editorial/listening review.
 
-Eva's Silero model is licensed CC BY-NC-SA 4.0. The current implementation is a
-working noncommercial preview. Before monetization or commercial deployment,
-obtain appropriate rights or replace Eva with a commercially licensed German
-voice and repeat the listening/intelligibility checks. Attribution and model
-links are in the main README.
+Put scene ideas under `## Image prompt` and cover ideas under `## Thumbnail
+prompt`. Other prose sections are authoring notes; they are not executable
+pipeline instructions. The complete Markdown source is included with R2 output.
+
+## Your GitHub Actions secrets
+
+The workflow accepts these exact names:
+
+| Secret | Expected value |
+|---|---|
+| `ACCESS_KEY_ID` | Cloudflare R2 S3 access key id |
+| `SECRET_ACCESS_KEY` | R2 S3 secret access key |
+| `BUCKET_NAME` | Existing bucket name |
+| `S3_API` | HTTPS R2 S3 endpoint; an optional trailing `/bucket-name` is accepted |
+| `PUBLIC_URL` | HTTPS public bucket/domain base URL, e.g. your `r2.dev` address |
+
+The S3 endpoint and public URL are different. The uploader uses S3_API for signed
+uploads, and PUBLIC_URL for viewer links. It never writes credentials into an
+episode, generated manifest or public index. Older R2-prefixed secret names are
+still accepted by the uploader for compatibility.
+
+A complete main-branch run stores versioned objects under:
+
+`episodes/<episode-id>/<source-commit>/<run-id>-<attempt>/`
+
+Video, MP3, thumbnail, subtitles, script and build metadata are uploaded. The
+manifest is written last. File sizes and public video access are checked before
+publishing the repository index. No artifact upload or automatic video commit
+is performed. Only the small public-link JSON is committed back to `published/`.
+The workflow token has contents-write permission for that operation. Its index
+commit does not trigger another render.
+
+Pull requests and explicit four-turn samples do not publish. Missing/partial
+credentials or a broken public URL cause publication to fail; a successful render
+alone is not reported as a successful delivery. Generated files on GitHub runners
+are temporary, so fix configuration errors and rerun the job if needed.
+
+## Local tests and manual runs
+
+```bash
+pip install -r requirements.txt
+python -m piper.download_voices --data-dir models de_DE-thorsten-medium
+python scripts/download_silero.py
+python -m unittest discover -s tests -v
+python scripts/discover_episodes.py
+python scripts/produce_episode.py --episode input/cafe-visit-a1.md
+```
+
+A GitHub push of a changed ready Markdown file triggers a full render. Image
+changes rebuild lessons that reference the image. Shared source changes rebuild
+all ready lessons. Manual **Actions → German episode production → Run workflow**
+can target an episode id; blank selects all ready lessons. Explicit short samples
+are checks only and are not stored in R2. Voice models/speech are cached to speed
+reruns. Caches are internal build accelerators, not viewer download artifacts.
+
+## Layout and voices
+
+The approved illustrated layout remains active. A separate proposed 16:9 design
+is in `docs/layout-concept-16x9.jpg`; it is not the default renderer.
+
+Eva's German model is licensed CC BY-NC-SA 4.0. Obtain appropriate rights or use a
+commercially licensed replacement before monetized use. Model attribution and
+license links are in the README. The pipeline can check intelligibility with the
+optional ASR audit, but does not promise flawless pronunciation for every script.

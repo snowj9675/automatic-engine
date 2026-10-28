@@ -14,6 +14,8 @@ def verify(folder):
     video = next(s for s in probe['streams'] if s['codec_type']=='video')
     assert (video['width'],video['height']) == (1280,1000)
     assert abs(float(probe['format']['duration'])-timeline[-1]['end']) < .15
+    for stream in probe['streams']:
+        assert abs(float(stream['duration'])-timeline[-1]['end']) < .15, 'Incomplete or misaligned media stream'
     episode = json.loads((folder/'episode.json').read_text())
     with wave.open(str(folder/'podcast.wav'), 'rb') as audio:
         samples = array.array('h', audio.readframes(audio.getnframes()))
