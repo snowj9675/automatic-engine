@@ -1,0 +1,27 @@
+name: Inspect existing R2 delivery
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/r2-recovery.json', '.github/recover_r2.py', '.github/workflows/recover-r2.yml']
+permissions:
+  contents: write
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3==1.40.0
+      - name: Check stored video and intended-public viewer URL
+        env:
+          ACCESS_KEY_ID: ${{ secrets.ACCESS_KEY_ID }}
+          SECRET_ACCESS_KEY: ${{ secrets.SECRET_ACCESS_KEY }}
+          BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+          S3_API: ${{ secrets.S3_API }}
+          PUBLIC_URL: ${{ secrets.PUBLIC_URL }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python .github/recover_r2.py
