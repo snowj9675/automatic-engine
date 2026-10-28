@@ -22,7 +22,7 @@ class EpisodeTests(unittest.TestCase):
                 output = Path(tmp)/f'{i}.png'
                 render.draw_frame(background,self.data,line,0,output)
                 with render.Image.open(output) as frame:
-                    self.assertEqual(frame.size,(1280,1000))
+                    self.assertEqual(frame.size,(1280,720))
 
     def test_unknown_speaker_rejected(self):
         self.data['lines'][0]['speaker']='other'

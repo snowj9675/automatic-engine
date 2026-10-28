@@ -12,7 +12,7 @@ def verify(folder):
     probe = json.loads(subprocess.check_output(['ffprobe','-v','error','-show_streams','-show_format','-of','json',str(folder/'podcast.mp4')]))
     assert {s['codec_type'] for s in probe['streams']} == {'audio','video'}
     video = next(s for s in probe['streams'] if s['codec_type']=='video')
-    assert (video['width'],video['height']) == (1280,1000)
+    assert (video['width'],video['height']) == (1280,720)
     assert abs(float(probe['format']['duration'])-timeline[-1]['end']) < .15
     for stream in probe['streams']:
         assert abs(float(stream['duration'])-timeline[-1]['end']) < .15, 'Incomplete or misaligned media stream'

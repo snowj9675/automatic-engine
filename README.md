@@ -7,18 +7,18 @@ in a separate bottom band. The illustration itself is static (no lip sync).
 
 ## Visual style
 
-Warm cream and espresso framing, teal/coral speaker accents, name badges, subtle
-shadows, shaped speech tails, and a dedicated English subtitle band. The header
-shows the current turn and playback speed. Faces and the full café scene remain
-visible.
+The current video uses a full 16:9 scene with simple white, dark-outlined speech
+bubbles placed above the active character. German text is bold and wraps into
+balanced lines. English subtitles sit over a soft fade at the bottom. There is
+no top banner, title, level badge, sentence counter, speed display or name tag.
 
-![Café episode preview](samples/cafe-a1-preview.jpg)
+![Current speech-bubble layout](docs/layout-speech-bubble-0.jpg)
 
-## Included preview
+## Latest video
 
-The checked-in [updated video](samples/cafe-a1.mp4) and [audio](samples/cafe-a1.mp3)
-contain all 12 turns, rendered with Eva and Thorsten. Local stream/duration checks and a full
-FFmpeg decode passed. English and German subtitles are also in `samples/`.
+The latest R2 video, audio and thumbnail links are recorded in
+[published/cafe-visit-a1.json](published/cafe-visit-a1.json). The checked-in
+`samples/` files are older voice tests and retain their earlier layout.
 
 ## Episode production
 

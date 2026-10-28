@@ -131,8 +131,10 @@ reruns. Caches are internal build accelerators, not viewer download artifacts.
 
 ## Layout and voices
 
-The approved illustrated layout remains active. A separate proposed 16:9 design
-is in `docs/layout-concept-16x9.jpg`; it is not the default renderer.
+The video fills a 1280×720 scene. Simple white speech bubbles appear above the
+active character, with bold German text and bottom English subtitles. There is
+no top banner or sentence/speed display. This follows the supplied conversation
+reference; the earlier editorial frame and concept image are superseded.
 
 Eva's German model is licensed CC BY-NC-SA 4.0. Obtain appropriate rights or use a
 commercially licensed replacement before monetized use. Model attribution and

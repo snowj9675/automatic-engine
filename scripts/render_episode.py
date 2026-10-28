@@ -11,12 +11,13 @@ import subprocess
 import wave
 import unicodedata
 from functools import lru_cache
+from itertools import combinations
 
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import edge_tts
 
 ROOT = Path(__file__).resolve().parents[1]
-W, H, SR = 1280, 1000, 48000
+W, H, SR = 1280, 720, 48000
 
 
 def run(args):
@@ -111,90 +112,68 @@ def layout(text, f, max_width):
     return rows
 
 
+def bubble_layout(text):
+    # Balance short lines so a single final word does not make a wide banner-shaped box.
+    words=list(enumerate(text.split()))
+    for size in (42,40,38,36,34,32):
+        f=ImageFont.truetype('DejaVuSans-Bold.ttf',size)
+        line_height=size+8
+        for count in (1,2,3):
+            if count>len(words) or count*line_height+22>146:continue
+            best=None
+            for cuts in combinations(range(1,len(words)),count-1):
+                points=(0,*cuts,len(words))
+                rows=[words[start:end] for start,end in zip(points,points[1:])]
+                widths=[f.getlength(' '.join(word for _,word in row)) for row in rows]
+                if max(widths)>650:continue
+                score=max(widths)+(max(widths)-min(widths))*.15
+                if best is None or score<best[0]:best=(score,rows,max(widths))
+            if best is not None:
+                return f,best[1],round(best[2])+36,count*line_height+22,line_height
+    raise ValueError('Dialogue is too long for a speech bubble. Split it into shorter caption turns.')
+
+
 def draw_frame(background, data, line, active, dest):
-    # Warm editorial frame; the illustration remains fully visible.
-    im = Image.new('RGB', (W, H), '#f4eee4')
-    im.paste(background, (0, 200))
-    d = ImageDraw.Draw(im)
-    male = speaker_position(data,line['speaker']) == 'left'
-    accent = '#277e80' if male else '#bc6546'
-    tint = '#e6f2ef' if male else '#fae8dd'
-    ink = '#332a23'
-    name = data['speakers'][line['speaker']]['name']
-    # Quiet ornamental rings add texture without competing with the words.
-    for radius in (110, 140, 170):
-        d.ellipse((1120-radius, -100-radius, 1120+radius, -100+radius), outline='#e5d9c9', width=1)
-    title_font = ImageFont.truetype('DejaVuSerif.ttf', 27)
-    title=data.get('display_title',data['title'])
-    if title_font.getlength(title)>600:
-        title_font=ImageFont.truetype('DejaVuSerif.ttf',20)
-    if title_font.getlength(title)>600:
-        raise ValueError('Use a shorter display_title for the video header.')
-    d.text((34,13),title,font=title_font,fill=ink)
-    badge=max(195,round(54+title_font.getlength(title)))
-    d.rounded_rectangle((badge,15,badge+50,42),radius=12,fill=ink)
-    d.text((badge+13,18),data['level'],font=font(16),fill='#fff8ed')
-    d.text((badge+72,20),'DEUTSCH IM ALLTAG',font=font(13),fill='#796a5b')
-    speed = data.get('playback_speed', 1.0)
-    progress = f"{line.get('_turn', 1):02} / {line.get('_total', len(data['lines'])):02}"
-    d.text((1040, 20), f'{progress}   ·   {speed:.2f}×', font=font(16), fill='#796a5b')
-    left, right = (38, 980) if male else (300, 1242)
-    top, bottom = 62, 180
-    anchor = 380 if male else 925
-    # Shadow follows both the card and its asymmetric speech tail.
-    shadow = Image.new('RGBA', im.size)
-    sd = ImageDraw.Draw(shadow)
-    sd.rounded_rectangle((left, top+7, right, bottom+7), radius=27, fill=(56,36,20,40))
-    sd.polygon([(anchor-28,bottom+2),(anchor+22,bottom+2),(anchor+9,233)],fill=(56,36,20,40))
-    im = Image.alpha_composite(im.convert('RGBA'),shadow.filter(ImageFilter.GaussianBlur(8))).convert('RGB')
-    d = ImageDraw.Draw(im)
-    d.rounded_rectangle((left,top,right,bottom),radius=27,fill='#fffcf6',outline='#dfd3c4',width=1)
-    d.polygon([(anchor-28,bottom-1),(anchor+22,bottom-1),(anchor+9,226)],fill='#fffcf6')
-    d.line([(anchor-28,bottom),(anchor+9,226),(anchor+22,bottom)],fill='#dfd3c4',width=1)
-    d.rounded_rectangle((left+14,top+24,left+19,bottom-23),radius=2,fill=accent)
-    label = name.upper()
-    label_width = font(14).getlength(label) + 28
-    d.rounded_rectangle((left+32,top+12,left+32+label_width,top+36),radius=11,fill=tint)
-    d.text((left+46,top+15),label,font=font(14),fill=accent)
-    # Small audio glyph makes the active speaker easy to identify.
-    for offset, height in enumerate([5, 13, 20, 11, 5]):
-        x = right-57+offset*6
-        d.line((x,top+26-height/2,x,top+26+height/2),fill=accent,width=3)
-    f = font(32)
-    rows = layout(line['de'],f,right-left-80)
-    if len(rows)>2:
-        f=font(28)
-        rows=layout(line['de'],f,right-left-80)
-    if len(rows)>2:
-        raise ValueError('Dialogue does not fit the speech bubble.')
-    y = top+43 if len(rows)==2 else top+57
+    # The scene fills the 16:9 canvas. No title, counter, speed or speaker-name banner.
+    im=ImageOps.fit(background.convert('RGB'),(W,H),method=Image.Resampling.LANCZOS)
+    d=ImageDraw.Draw(im)
+    on_left=speaker_position(data,line['speaker'])=='left'
+    f,rows,width,height,line_height=bubble_layout(line['de'])
+    center=340 if on_left else 940
+    x=max(10,min(W-width-10,round(center-width/2)))
+    y=8 if on_left else 20
+    # A small tail points toward the active character without crossing a face.
+    tip=max(x+24,min(x+width-24,center))
+    d.polygon([(tip-11,y+height-2),(tip+11,y+height-2),(tip,y+height+9)],fill='white',outline='#272727',width=2)
+    d.rounded_rectangle((x,y,x+width,y+height),radius=18,fill='white',outline='#272727',width=2)
+    d.polygon([(tip-8,y+height-3),(tip+8,y+height-3),(tip,y+height+6)],fill='white')
+    text_y=y+11
     for row in rows:
-        x = left+34
-        for index, word in row:
-            width = f.getlength(word)
-            if index == active:
-                d.rounded_rectangle((x-4,y-2,x+width+5,y+37),radius=8,fill=tint)
-                d.line((x,y+37,x+width,y+37),fill=accent,width=2)
-            d.text((x,y),word,font=f,fill=ink)
-            x += f.getlength(word+' ')
-        y += 37
-    # Bilingual subtitle band echoes the rounded speaker card.
-    d.rectangle((0,918,W,H),fill='#302720')
-    d.line((34,918,W-34,918),fill='#b99c76',width=2)
-    d.rounded_rectangle((32,939,76,973),radius=12,fill='#514237')
-    d.text((42,947),'EN',font=font(15),fill='#e8d1ad')
-    tf = font(26)
-    rows = layout(line['translation'],tf,W-180)
-    if len(rows)>2:
-        raise ValueError('Translation does not fit the bottom band.')
-    y = 925 if len(rows)==2 else 944
-    for row in rows:
-        text = ' '.join(word for _,word in row)
-        d.text((90+(W-180-tf.getlength(text))/2,y),text,font=tf,fill='#fff8ee')
-        y += 32
+        text_x=x+18
+        for index,word in row:
+            word_width=f.getlength(word)
+            if index==active:
+                d.rounded_rectangle((text_x-3,text_y-1,text_x+word_width+3,text_y+line_height-3),radius=5,fill='#fff1a8')
+            d.text((text_x,text_y),word,font=f,fill='#101010',anchor='lt')
+            text_x+=f.getlength(word+' ')
+        text_y+=line_height
+    # English stays at the bottom, with a soft contrast fade rather than a label bar.
+    overlay=Image.new('RGBA',(W,H))
+    od=ImageDraw.Draw(overlay)
+    for yy in range(H-108,H):
+        od.line((0,yy,W,yy),fill=(0,0,0,round(190*(yy-(H-108))/108)))
+    im=Image.alpha_composite(im.convert('RGBA'),overlay).convert('RGB')
+    d=ImageDraw.Draw(im)
+    tf=font(28)
+    translated=layout(line['translation'],tf,W-64)
+    if len(translated)>2:raise ValueError('Translation is too long for two bottom subtitle lines.')
+    ty=H-16-34*len(translated)
+    for row in translated:
+        text=' '.join(word for _,word in row)
+        d.text(((W-tf.getlength(text))/2,ty),text,font=tf,fill='white',stroke_width=1,stroke_fill='#202020',anchor='lt')
+        ty+=34
     im.save(dest,quality=95,subsampling=0)
-    with Image.open(dest) as check:
-        check.load()
+    with Image.open(dest) as check:check.load()
 
 
 def srt_time(seconds):
@@ -277,7 +256,7 @@ async def build(args):
     cache.mkdir(exist_ok=True)
     frames = out / 'frames'
     frames.mkdir(exist_ok=True)
-    background = Image.open(args.image).convert('RGB').resize((1280,718), Image.Resampling.LANCZOS)
+    background = Image.open(args.image).convert('RGB').resize((W,H), Image.Resampling.LANCZOS)
     preview = frames/'layout-check.jpg'
     for line in data['lines']:
         draw_frame(background,data,line,-1,preview)

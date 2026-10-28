@@ -90,6 +90,7 @@ jobs:
           key: speech-${{ runner.os }}-${{ matrix.slug }}-${{ hashFiles('scripts/render_episode.py') }}-${{ github.sha }}
           restore-keys: |
             speech-${{ runner.os }}-${{ matrix.slug }}-${{ hashFiles('scripts/render_episode.py') }}-
+            speech-${{ runner.os }}-${{ matrix.slug }}-
       - name: Generate and verify episode
         id: render
         env:
