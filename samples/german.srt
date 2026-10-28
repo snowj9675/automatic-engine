@@ -1,0 +1,47 @@
+1
+00:00:00,000 --> 00:00:03,042
+Hallo, Anna! Wie geht es dir?
+
+2
+00:00:03,042 --> 00:00:05,580
+Gut, danke! Und dir?
+
+3
+00:00:05,580 --> 00:00:08,227
+Auch gut. Was möchtest du trinken?
+
+4
+00:00:08,227 --> 00:00:10,845
+Ich möchte einen Tee, bitte.
+
+5
+00:00:10,845 --> 00:00:13,097
+Mit Milch oder ohne Milch?
+
+6
+00:00:13,097 --> 00:00:14,691
+Ohne Milch. Und du?
+
+7
+00:00:14,691 --> 00:00:17,210
+Ich nehme einen Kaffee mit Milch.
+
+8
+00:00:17,210 --> 00:00:19,860
+Möchtest du auch einen Kuchen?
+
+9
+00:00:19,860 --> 00:00:22,681
+Ja, bitte. Ich habe Hunger.
+
+10
+00:00:22,681 --> 00:00:25,315
+Ich auch. Der Kuchen ist gut!
+
+11
+00:00:25,315 --> 00:00:27,231
+Ist dein Tee heiß?
+
+12
+00:00:27,231 --> 00:00:29,209
+Ja. Ich warte noch.
