@@ -1,12 +1,12 @@
 {
   "episode_id": "cafe-visit-a1",
-  "source_revision": "bf3060033b4db929ebe9b1e455658f0b0736ac74",
-  "build_id": "40676707988-1",
+  "source_revision": "1f085b557e96a78eece6733394b426815b44869c",
+  "build_id": "40711794861-1",
   "duration_seconds": 518.9814375000001,
-  "published_at": "2026-10-28T11:05:47.399976+00:00",
-  "video_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/bf3060033b4db929ebe9b1e455658f0b0736ac74/40676707988-1/podcast.mp4",
-  "audio_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/bf3060033b4db929ebe9b1e455658f0b0736ac74/40676707988-1/podcast.mp3",
-  "thumbnail_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/bf3060033b4db929ebe9b1e455658f0b0736ac74/40676707988-1/thumbnail.png",
-  "manifest_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/bf3060033b4db929ebe9b1e455658f0b0736ac74/40676707988-1/manifest.json",
+  "published_at": "2026-10-28T15:04:13.067388+00:00",
+  "video_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/1f085b557e96a78eece6733394b426815b44869c/40711794861-1/podcast.mp4",
+  "audio_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/1f085b557e96a78eece6733394b426815b44869c/40711794861-1/podcast.mp3",
+  "thumbnail_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/1f085b557e96a78eece6733394b426815b44869c/40711794861-1/thumbnail.png",
+  "manifest_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/episodes/cafe-visit-a1/1f085b557e96a78eece6733394b426815b44869c/40711794861-1/manifest.json",
   "public_verified": true
 }
