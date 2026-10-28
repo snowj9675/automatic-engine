@@ -23,23 +23,45 @@ def run(args):
     subprocess.run([str(x) for x in args], check=True, stdout=subprocess.DEVNULL)
 
 
+def speaker_position(data, speaker_id):
+    return data['speakers'][speaker_id].get('position', 'left' if speaker_id == 'male' else 'right')
+
+
 def validate(data):
-    if data.get('level') != 'A1' or not data.get('lines'):
-        raise ValueError('An A1 episode with at least one line is required.')
-    if set(data['speakers']) != {'male', 'female'}:
-        raise ValueError('Define male and female speakers.')
-    if not 0 <= data.get('pause_seconds', .65) <= 5:
+    if data.get('level') not in {'A1','A2'} or not data.get('lines'):
+        raise ValueError('An A1 or A2 episode with at least one line is required.')
+    speakers=data.get('speakers',{})
+    if len(speakers)!=2:
+        raise ValueError('Define exactly two speakers.')
+    if {speaker_position(data,key) for key in speakers} != {'left','right'}:
+        raise ValueError('Place one speaker on the left and one on the right.')
+    for key,speaker in speakers.items():
+        if not speaker.get('name') or len(speaker['name'])>24:
+            raise ValueError('Speaker names must contain 1–24 characters.')
+        engine=speaker.get('engine','piper')
+        if engine not in {'piper','silero','edge'}:
+            raise ValueError('Unsupported speaker engine.')
+        if engine=='silero' and not speaker.get('silero_voice'):
+            raise ValueError('Select a Silero voice.')
+        if engine=='piper' and key not in {'male','female'} and not speaker.get('piper_voice'):
+            raise ValueError('Named characters need an explicit piper_voice.')
+    if not 0 <= data.get('pause_seconds',.65) <= 5:
         raise ValueError('Pause must be between 0 and 5 seconds.')
-    if not 0.5 <= data.get('playback_speed', 1.0) <= 2.0:
+    if not .5 <= data.get('playback_speed',1.) <= 2.:
         raise ValueError('Playback speed must be between 0.5 and 2.0.')
+    target=data.get('target_duration_seconds')
+    if target is not None and (not isinstance(target,list) or len(target)!=2 or
+                              not all(isinstance(n,(int,float)) for n in target) or not 0<target[0]<=target[1]<=3600):
+        raise ValueError('Duration target must be [minimum, maximum] seconds, at most one hour.')
+    word_limit=12 if data['level']=='A1' else 18
     for line in data['lines']:
-        if line['speaker'] not in data['speakers']:
+        if line['speaker'] not in speakers:
             raise ValueError('Unknown speaker.')
         if not line['de'].strip() or not line['translation'].strip():
             raise ValueError('German text and translation are required.')
-        if len(line['de'].split()) > 12 or '\n' in line['de']:
-            raise ValueError('Keep each A1 turn short: at most 12 words, one paragraph.')
-    # This checks structure, not CEFR proficiency. Scripts require editorial review.
+        if len(line['de'].split())>word_limit or '\n' in line['de']:
+            raise ValueError(f'Keep each {data["level"]} caption short: at most {word_limit} words, one paragraph.')
+    # Structural checks cannot certify CEFR level; scripts require editorial review.
 
 
 async def synthesize(text, voice, rate, directory):
@@ -94,7 +116,7 @@ def draw_frame(background, data, line, active, dest):
     im = Image.new('RGB', (W, H), '#f4eee4')
     im.paste(background, (0, 200))
     d = ImageDraw.Draw(im)
-    male = line['speaker'] == 'male'
+    male = speaker_position(data,line['speaker']) == 'left'
     accent = '#277e80' if male else '#bc6546'
     tint = '#e6f2ef' if male else '#fae8dd'
     ink = '#332a23'
@@ -103,10 +125,16 @@ def draw_frame(background, data, line, active, dest):
     for radius in (110, 140, 170):
         d.ellipse((1120-radius, -100-radius, 1120+radius, -100+radius), outline='#e5d9c9', width=1)
     title_font = ImageFont.truetype('DejaVuSerif.ttf', 27)
-    d.text((34, 13), data['title'], font=title_font, fill=ink)
-    d.rounded_rectangle((195, 15, 245, 42), radius=12, fill=ink)
-    d.text((208, 18), 'A1', font=font(16), fill='#fff8ed')
-    d.text((267, 20), 'DEUTSCH IM ALLTAG', font=font(13), fill='#796a5b')
+    title=data.get('display_title',data['title'])
+    if title_font.getlength(title)>600:
+        title_font=ImageFont.truetype('DejaVuSerif.ttf',20)
+    if title_font.getlength(title)>600:
+        raise ValueError('Use a shorter display_title for the video header.')
+    d.text((34,13),title,font=title_font,fill=ink)
+    badge=max(195,round(54+title_font.getlength(title)))
+    d.rounded_rectangle((badge,15,badge+50,42),radius=12,fill=ink)
+    d.text((badge+13,18),data['level'],font=font(16),fill='#fff8ed')
+    d.text((badge+72,20),'DEUTSCH IM ALLTAG',font=font(13),fill='#796a5b')
     speed = data.get('playback_speed', 1.0)
     progress = f"{line.get('_turn', 1):02} / {line.get('_total', len(data['lines'])):02}"
     d.text((1040, 20), f'{progress}   ·   {speed:.2f}×', font=font(16), fill='#796a5b')
@@ -134,6 +162,9 @@ def draw_frame(background, data, line, active, dest):
         d.line((x,top+26-height/2,x,top+26+height/2),fill=accent,width=3)
     f = font(32)
     rows = layout(line['de'],f,right-left-80)
+    if len(rows)>2:
+        f=font(28)
+        rows=layout(line['de'],f,right-left-80)
     if len(rows)>2:
         raise ValueError('Dialogue does not fit the speech bubble.')
     y = top+43 if len(rows)==2 else top+57
@@ -235,8 +266,13 @@ async def build(args):
     frames = out / 'frames'
     frames.mkdir(exist_ok=True)
     background = Image.open(args.image).convert('RGB').resize((1280,718), Image.Resampling.LANCZOS)
+    preview = frames/'layout-check.jpg'
+    for line in data['lines']:
+        draw_frame(background,data,line,-1,preview)
+    preview.unlink(missing_ok=True)
     timeline, frame_list, german, translations = [], [], [], []
     cursor = .0
+    audio_position = 0
     # Whole timeline is assembled in PCM; subtitle offsets use the same sample counts.
     with wave.open(str(out/'podcast.wav'), 'wb') as combined:
         combined.setparams((1,2,SR,0,'NONE','not compressed'))
@@ -281,7 +317,8 @@ async def build(args):
                              'words':[{**w,'start':w['start']+cursor,'end':w['end']+cursor} for w in words]})
             for entries, text in [(german,line['de']),(translations,line['translation'])]:
                 entries.append(f'{number}\n{srt_time(cursor)} --> {srt_time(cursor+total)}\n{text}\n')
-            cursor += total
+            audio_position += len(pcm)//2 + pause_samples
+            cursor = audio_position/SR
     # concat requires a repeated final image for its last duration.
     frame_list.append(frame_list[-2])
     (out/'frames.txt').write_text('\n'.join(frame_list)+'\n')

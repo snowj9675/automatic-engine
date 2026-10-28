@@ -1,0 +1,97 @@
+{
+  "title": "Im Café",
+  "level": "A1",
+  "translation_language": "English",
+  "rate": "-15%",
+  "pause_seconds": 0.65,
+  "speakers": {
+    "male": {
+      "name": "Ben",
+      "voice": "de-DE-ConradNeural",
+      "piper_voice": "de_DE-thorsten-medium",
+      "engine": "piper",
+      "position": "left"
+    },
+    "female": {
+      "name": "Anna",
+      "voice": "de-DE-KatjaNeural",
+      "piper_voice": "de_DE-kerstin-low",
+      "engine": "silero",
+      "silero_voice": "eva_k",
+      "position": "right"
+    }
+  },
+  "lines": [
+    {
+      "speaker": "male",
+      "de": "Hallo, Anna! Wie geht es dir?",
+      "translation": "Hello, Anna! How are you?"
+    },
+    {
+      "speaker": "female",
+      "de": "Gut, danke! Und dir?",
+      "translation": "Good, thanks! And you?"
+    },
+    {
+      "speaker": "male",
+      "de": "Auch gut. Was möchtest du trinken?",
+      "translation": "Good too. What would you like to drink?"
+    },
+    {
+      "speaker": "female",
+      "de": "Ich möchte einen Tee, bitte.",
+      "translation": "I would like a tea, please."
+    },
+    {
+      "speaker": "male",
+      "de": "Mit Milch oder ohne Milch?",
+      "translation": "With milk or without milk?"
+    },
+    {
+      "speaker": "female",
+      "de": "Ohne Milch. Und du?",
+      "translation": "Without milk. And you?"
+    },
+    {
+      "speaker": "male",
+      "de": "Ich nehme einen Kaffee mit Milch.",
+      "translation": "I will have a coffee with milk."
+    },
+    {
+      "speaker": "female",
+      "de": "Möchtest du auch einen Kuchen?",
+      "translation": "Would you also like a cake?"
+    },
+    {
+      "speaker": "male",
+      "de": "Ja, bitte. Ich habe Hunger.",
+      "translation": "Yes, please. I am hungry."
+    },
+    {
+      "speaker": "female",
+      "de": "Ich auch. Der Kuchen ist gut!",
+      "translation": "Me too. The cake is good!"
+    },
+    {
+      "speaker": "male",
+      "de": "Ist dein Tee heiß?",
+      "translation": "Is your tea hot?"
+    },
+    {
+      "speaker": "female",
+      "de": "Ja. Ich warte noch.",
+      "translation": "Yes. I will wait a little longer."
+    }
+  ],
+  "playback_speed": 0.9,
+  "id": "cafe-a1-demo",
+  "ready": true,
+  "assets": {
+    "background": "../../cafe_two_people.png"
+  },
+  "thumbnail_title": "Im Café",
+  "target_duration_seconds": [
+    25,
+    60
+  ]
+}

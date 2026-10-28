@@ -1,0 +1,47 @@
+{
+  "title": "In der Küche",
+  "level": "A1",
+  "translation_language": "English",
+  "rate": "-15%",
+  "pause_seconds": 0.65,
+  "speakers": {
+    "male": {
+      "name": "Ben",
+      "voice": "de-DE-ConradNeural",
+      "piper_voice": "de_DE-thorsten-medium",
+      "engine": "piper",
+      "position": "left"
+    },
+    "female": {
+      "name": "Mama",
+      "voice": "de-DE-KatjaNeural",
+      "piper_voice": "de_DE-kerstin-low",
+      "engine": "silero",
+      "silero_voice": "eva_k",
+      "position": "right"
+    }
+  },
+  "lines": [
+    {
+      "speaker": "male",
+      "de": "Was kochen wir heute?",
+      "translation": "What are we cooking today?"
+    },
+    {
+      "speaker": "female",
+      "de": "Wir kochen eine Suppe.",
+      "translation": "We are cooking a soup."
+    }
+  ],
+  "playback_speed": 0.9,
+  "id": "your-episode-id",
+  "ready": false,
+  "assets": {
+    "background": "background.png"
+  },
+  "thumbnail_title": "Kochen mit Mama",
+  "target_duration_seconds": [
+    480,
+    600
+  ]
+}

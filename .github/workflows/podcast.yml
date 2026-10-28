@@ -1,27 +1,68 @@
-name: German A1 podcast
+name: German episode production
 on:
   workflow_dispatch:
     inputs:
+      episode:
+        description: Episode folder id (blank renders all ready episodes)
+        type: string
+        default: ''
       sample:
-        description: Render only the first four turns
+        description: Render a four-turn preview instead of the complete episode
         type: boolean
-        default: true
+        default: false
       engine:
-        description: Speech engine (Edge requires external service access)
+        description: Speech engine (auto uses each character's configured voice)
         type: choice
         options: [auto, piper, edge]
         default: auto
   push:
     branches: [main]
-    paths: ['scripts/**', 'episodes/**', 'tests/**', 'requirements.txt', '.github/workflows/podcast.yml']
+    paths: ['input/**', 'scripts/**', 'episodes/**', 'tests/**', '**.png', '**.jpg', '**.jpeg', 'requirements.txt', '.github/workflows/podcast.yml']
   pull_request:
-    paths: ['scripts/**', 'episodes/**', 'tests/**', 'requirements.txt', '.github/workflows/podcast.yml']
+    paths: ['input/**', 'scripts/**', 'episodes/**', 'tests/**', '**.png', '**.jpg', '**.jpeg', 'requirements.txt', '.github/workflows/podcast.yml']
 permissions:
   contents: read
 jobs:
-  render:
+  plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+      has_jobs: ${{ steps.discover.outputs.has_jobs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - id: discover
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          REQUESTED: ${{ inputs.episode }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess
+          args=['python','scripts/discover_episodes.py']
+          if os.environ['EVENT']!='workflow_dispatch' and os.environ['BASE']:
+              args+=['--base',os.environ['BASE'],'--head',os.environ['GITHUB_SHA']]
+          if os.environ['REQUESTED']:
+              args+=['--episode',os.environ['REQUESTED']]
+          matrix=json.loads(subprocess.check_output(args,text=True))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write('matrix='+json.dumps(matrix)+'\n')
+              f.write('has_jobs='+str(bool(matrix['include'])).lower()+'\n')
+          print('Ready episodes:', ', '.join(item['slug'] for item in matrix['include']) or 'none (drafts are skipped)')
+          PY
+  render:
+    needs: plan
+    if: needs.plan.outputs.has_jobs == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,31 +73,50 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
-      - name: Download local German voices
-        run: python -m piper.download_voices --data-dir models de_DE-thorsten-medium de_DE-kerstin-low
-      - name: Download verified German female voice
-        run: python scripts/download_silero.py
-      - name: Generate real audio and video
-        env:
-          ENGINE: ${{ inputs.engine || 'auto' }}
-          FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.sample == false }}
-        run: |
-          if [ "$FULL" = true ]; then
-            python scripts/render_episode.py --engine "$ENGINE"
-          else
-            python scripts/render_episode.py --engine "$ENGINE" --sample
-          fi
-      - name: Verify generated media
-        run: python scripts/verify_output.py output/cafe
-      - uses: actions/upload-artifact@v4
+      - uses: actions/cache@v4
         with:
-          name: german-a1-cafe
+          path: models
+          key: german-voices-thorsten-medium-silero-2e22f386-v1
+      - name: Download German voices
+        run: |
+          python -m piper.download_voices --data-dir models de_DE-thorsten-medium de_DE-kerstin-low
+          python scripts/download_silero.py
+      - uses: actions/cache@v4
+        with:
+          path: output/${{ matrix.slug }}/cache
+          key: speech-${{ runner.os }}-${{ matrix.slug }}-${{ hashFiles('scripts/render_episode.py') }}-${{ github.sha }}
+          restore-keys: |
+            speech-${{ runner.os }}-${{ matrix.slug }}-${{ hashFiles('scripts/render_episode.py') }}-
+      - name: Generate and verify episode
+        id: render
+        env:
+          EPISODE: ${{ matrix.episode }}
+          ENGINE: ${{ inputs.engine || 'auto' }}
+          SAMPLE: ${{ github.event_name == 'pull_request' || inputs.sample == true }}
+        run: |
+          args=()
+          if [ "$SAMPLE" = true ]; then args+=(--sample); fi
+          python scripts/produce_episode.py --episode "$EPISODE" --engine "$ENGINE" "${args[@]}"
+      - name: Publish complete episode to R2 when configured
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_PUBLIC_BASE_URL: ${{ vars.R2_PUBLIC_BASE_URL }}
+          EPISODE_ID: ${{ matrix.slug }}
+        run: python scripts/upload_r2.py "output/$EPISODE_ID"
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.render.outcome == 'success'
+        with:
+          name: german-${{ matrix.slug }}-${{ github.run_id }}
           path: |
-            output/cafe/podcast.mp4
-            output/cafe/podcast.mp3
-            output/cafe/german.srt
-            output/cafe/translation.srt
-            output/cafe/timeline.json
-            output/cafe/episode.json
+            output/${{ matrix.slug }}/*.mp4
+            output/${{ matrix.slug }}/*.mp3
+            output/${{ matrix.slug }}/*.srt
+            output/${{ matrix.slug }}/*.json
+            output/${{ matrix.slug }}/thumbnail.png
+            output/${{ matrix.slug }}/prompts.md
           if-no-files-found: error
           retention-days: 30

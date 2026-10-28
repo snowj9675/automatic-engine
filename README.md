@@ -20,12 +20,22 @@ The checked-in [updated video](samples/cafe-a1.mp4) and [audio](samples/cafe-a1.
 contain all 12 turns, rendered with Eva and Thorsten. Local stream/duration checks and a full
 FFmpeg decode passed. English and German subtitles are also in `samples/`.
 
-## Generate a sample on GitHub
+## Episode production
 
-Open **Actions → German A1 podcast** and open the latest successful run. Download
-**german-a1-cafe**, unzip it, and play `podcast.mp4` or `podcast.mp3`. Relevant commits on `main` and pull requests generate four turns. After merging, **Run workflow**
-lets you uncheck **sample** to render all 12 turns. Artifacts expire after 30 days.
-A failed voice-service request fails the job; it never substitutes silent audio.
+Put each lesson in `input/<episode-id>/` with `episode.json`, your background
+image and `prompts.md`. Set `ready: true` after the script and image are complete.
+A commit on `main` renders the full episode; pull requests use a four-turn preview.
+A1 and A2, arbitrary two-character names, speed, pauses, thumbnail artwork and
+duration targets are supported. Optional R2 upload activates when all four R2
+secrets are configured. GitHub artifacts remain available without R2.
+
+**[Production guide and R2 setup](docs/PRODUCTION.md)** ·
+**[Working episode](input/cafe-a1-demo/episode.json)** ·
+**[Draft template](input/_template/episode.json)**
+
+Open **Actions → German episode production** to download outputs or rerun an
+episode. New generated videos are workflow artifacts rather than automatic Git
+commits. The checked-in `samples/` videos remain reference previews.
 
 ## Local generation
 
