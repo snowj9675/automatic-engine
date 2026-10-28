@@ -32,6 +32,11 @@ class EpisodeTests(unittest.TestCase):
         self.data['lines'][0]['translation']=''
         with self.assertRaises(ValueError): render.validate(self.data)
 
+    def test_invalid_playback_speed_rejected(self):
+        for speed in (0, -1, 3):
+            self.data['playback_speed'] = speed
+            with self.assertRaises(ValueError): render.validate(self.data)
+
     def test_srt_millisecond_carry(self):
         self.assertEqual(render.srt_time(59.9996),'00:01:00,000')
         self.assertEqual(render.srt_time(3600.125),'01:00:00,125')

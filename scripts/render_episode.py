@@ -11,7 +11,7 @@ import subprocess
 import wave
 import unicodedata
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import edge_tts
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,6 +29,8 @@ def validate(data):
         raise ValueError('Define male and female speakers.')
     if not 0 <= data.get('pause_seconds', .65) <= 5:
         raise ValueError('Pause must be between 0 and 5 seconds.')
+    if not 0.5 <= data.get('playback_speed', 1.0) <= 2.0:
+        raise ValueError('Playback speed must be between 0.5 and 2.0.')
     for line in data['lines']:
         if line['speaker'] not in data['speakers']:
             raise ValueError('Unknown speaker.')
@@ -87,41 +89,78 @@ def layout(text, f, max_width):
 
 
 def draw_frame(background, data, line, active, dest):
-    im = Image.new('RGB', (W, H), '#101b2b')
+    # Warm editorial frame; the illustration remains fully visible.
+    im = Image.new('RGB', (W, H), '#f4eee4')
     im.paste(background, (0, 200))
     d = ImageDraw.Draw(im)
     male = line['speaker'] == 'male'
-    accent = '#70cfff' if male else '#ffc382'
+    accent = '#277e80' if male else '#bc6546'
+    tint = '#e6f2ef' if male else '#fae8dd'
+    ink = '#332a23'
     name = data['speakers'][line['speaker']]['name']
-    d.text((34, 13), f"DEUTSCH A1  /  {data['title']}", font=font(19), fill='#cad7e5')
-    d.text((1040, 13), f'{name} spricht', font=font(19), fill=accent)
-    left, right = (32, 960) if male else (320, 1248)
-    d.rounded_rectangle((left, 47, right, 177), radius=22, fill='#f8fafc', outline=accent, width=3)
-    anchor = 445 if male else 910
-    d.polygon([(anchor-25, 174), (anchor+25, 174), (anchor, 220)], fill='#f8fafc')
-    f = font(36)
-    rows = layout(line['de'], f, right-left-60)
-    if len(rows) > 2:
+    # Quiet ornamental rings add texture without competing with the words.
+    for radius in (110, 140, 170):
+        d.ellipse((1120-radius, -100-radius, 1120+radius, -100+radius), outline='#e5d9c9', width=1)
+    title_font = ImageFont.truetype('DejaVuSerif.ttf', 27)
+    d.text((34, 13), data['title'], font=title_font, fill=ink)
+    d.rounded_rectangle((195, 15, 245, 42), radius=12, fill=ink)
+    d.text((208, 18), 'A1', font=font(16), fill='#fff8ed')
+    d.text((267, 20), 'DEUTSCH IM ALLTAG', font=font(13), fill='#796a5b')
+    speed = data.get('playback_speed', 1.0)
+    progress = f"{line.get('_turn', 1):02} / {line.get('_total', len(data['lines'])):02}"
+    d.text((1040, 20), f'{progress}   ·   {speed:.2f}×', font=font(16), fill='#796a5b')
+    left, right = (38, 980) if male else (300, 1242)
+    top, bottom = 62, 180
+    anchor = 380 if male else 925
+    # Shadow follows both the card and its asymmetric speech tail.
+    shadow = Image.new('RGBA', im.size)
+    sd = ImageDraw.Draw(shadow)
+    sd.rounded_rectangle((left, top+7, right, bottom+7), radius=27, fill=(56,36,20,40))
+    sd.polygon([(anchor-28,bottom+2),(anchor+22,bottom+2),(anchor+9,233)],fill=(56,36,20,40))
+    im = Image.alpha_composite(im.convert('RGBA'),shadow.filter(ImageFilter.GaussianBlur(8))).convert('RGB')
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((left,top,right,bottom),radius=27,fill='#fffcf6',outline='#dfd3c4',width=1)
+    d.polygon([(anchor-28,bottom-1),(anchor+22,bottom-1),(anchor+9,226)],fill='#fffcf6')
+    d.line([(anchor-28,bottom),(anchor+9,226),(anchor+22,bottom)],fill='#dfd3c4',width=1)
+    d.rounded_rectangle((left+14,top+24,left+19,bottom-23),radius=2,fill=accent)
+    label = name.upper()
+    label_width = font(14).getlength(label) + 28
+    d.rounded_rectangle((left+32,top+12,left+32+label_width,top+36),radius=11,fill=tint)
+    d.text((left+46,top+15),label,font=font(14),fill=accent)
+    # Small audio glyph makes the active speaker easy to identify.
+    for offset, height in enumerate([5, 13, 20, 11, 5]):
+        x = right-57+offset*6
+        d.line((x,top+26-height/2,x,top+26+height/2),fill=accent,width=3)
+    f = font(32)
+    rows = layout(line['de'],f,right-left-80)
+    if len(rows)>2:
         raise ValueError('Dialogue does not fit the speech bubble.')
-    y = 64 if len(rows) == 2 else 87
+    y = top+43 if len(rows)==2 else top+57
     for row in rows:
-        x = left + 28
+        x = left+34
         for index, word in row:
             width = f.getlength(word)
             if index == active:
-                d.rounded_rectangle((x-4,y-3,x+width+5,y+44),radius=7,fill=accent)
-            d.text((x, y), word, font=f, fill='#132033')
-            x += f.getlength(word + ' ')
-        y += 49
-    d.rectangle((0, 918, W, H), fill='#101b2b')
-    tf = font(28)
-    rows = layout(line['translation'], tf, W-90)
-    if len(rows) > 2:
+                d.rounded_rectangle((x-4,y-2,x+width+5,y+37),radius=8,fill=tint)
+                d.line((x,y+37,x+width,y+37),fill=accent,width=2)
+            d.text((x,y),word,font=f,fill=ink)
+            x += f.getlength(word+' ')
+        y += 37
+    # Bilingual subtitle band echoes the rounded speaker card.
+    d.rectangle((0,918,W,H),fill='#302720')
+    d.line((34,918,W-34,918),fill='#b99c76',width=2)
+    d.rounded_rectangle((32,939,76,973),radius=12,fill='#514237')
+    d.text((42,947),'EN',font=font(15),fill='#e8d1ad')
+    tf = font(26)
+    rows = layout(line['translation'],tf,W-180)
+    if len(rows)>2:
         raise ValueError('Translation does not fit the bottom band.')
-    for i, row in enumerate(rows):
+    y = 925 if len(rows)==2 else 944
+    for row in rows:
         text = ' '.join(word for _,word in row)
-        d.text(((W-tf.getlength(text))/2, 927+i*32), text, font=tf, fill='white')
-    im.save(dest, quality=95, subsampling=0)
+        d.text((90+(W-180-tf.getlength(text))/2,y),text,font=tf,fill='#fff8ee')
+        y += 32
+    im.save(dest,quality=95,subsampling=0)
     with Image.open(dest) as check:
         check.load()
 
@@ -151,7 +190,10 @@ def synthesize_piper(text, speaker, directory, models):
 
 async def build(args):
     data = json.loads(args.episode.read_text())
+    if args.speed is not None:
+        data['playback_speed'] = args.speed
     validate(data)
+    speed = data.get('playback_speed', 1.0)
     data['engine'] = args.engine
     if args.sample:
         data['lines'] = data['lines'][:4]
@@ -175,11 +217,12 @@ async def build(args):
                 mp3, words = synthesize_piper(line['de'], line['speaker'], cache, args.models)
             else:
                 mp3, words = await synthesize(line['de'], data['speakers'][line['speaker']]['voice'], data['rate'], cache)
-            wav = cache / (mp3.stem + '-48k.wav')
-            run(['ffmpeg','-v','error','-y','-i',mp3,'-ac','1','-ar',SR,'-c:a','pcm_s16le',wav])
+            wav = cache / (mp3.stem + f'-48k-{speed:.4f}.wav')
+            run(['ffmpeg','-v','error','-y','-i',mp3,'-af',f'atempo={speed}','-ac','1','-ar',SR,'-c:a','pcm_s16le',wav])
             with wave.open(str(wav),'rb') as audio:
                 pcm = audio.readframes(audio.getnframes())
             duration = len(pcm) / (SR*2)
+            words = [{**w, 'start':w['start']/speed, 'end':w['end']/speed} for w in words]
             if any(w['start'] < 0 or w['end'] > duration+.1 for w in words):
                 raise ValueError('TTS word timing is outside the audio.')
             # Compare word order to avoid highlighting the wrong word silently.
@@ -194,7 +237,7 @@ async def build(args):
                 if end <= start:
                     continue
                 path = frames / f'{number:03}-{i:03}.jpg'
-                draw_frame(background,data,line,active,path)
+                draw_frame(background,data,{**line,'_turn':number,'_total':len(data['lines'])},active,path)
                 frame_list += [f"file '{path.as_posix()}'", f'duration {end-start:.8f}']
             timeline.append({**line,'start':cursor,'speech_end':cursor+duration,'end':cursor+total,
                              'words':[{**w,'start':w['start']+cursor,'end':w['end']+cursor} for w in words]})
@@ -222,5 +265,6 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, default=ROOT/'output/cafe')
     parser.add_argument('--engine', choices=['edge','piper'], default='piper')
     parser.add_argument('--models', type=Path, default=ROOT/'models')
+    parser.add_argument('--speed', type=float, help='Pitch-preserving speed multiplier; overrides episode playback_speed.')
     parser.add_argument('--sample',action='store_true',help='Render the first four turns.')
     asyncio.run(build(parser.parse_args()))

@@ -11,6 +11,9 @@ on:
         type: choice
         options: [piper, edge]
         default: piper
+  push:
+    branches: [main]
+    paths: ['scripts/**', 'episodes/**', 'tests/**', 'requirements.txt', '.github/workflows/podcast.yml']
   pull_request:
     paths: ['scripts/**', 'episodes/**', 'tests/**', 'requirements.txt', '.github/workflows/podcast.yml']
 permissions:

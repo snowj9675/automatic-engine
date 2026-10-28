@@ -5,16 +5,25 @@ Anna on the right. Only the current speaker's bubble appears, with optional word
 highlighting when using the Edge engine. English translations stay
 in a separate bottom band. The illustration itself is static (no lip sync).
 
+## Visual style
+
+Warm cream and espresso framing, teal/coral speaker accents, name badges, subtle
+shadows, shaped speech tails, and a dedicated English subtitle band. The header
+shows the current turn and playback speed. Faces and the full café scene remain
+visible.
+
+![Café episode preview](samples/cafe-a1-preview.jpg)
+
 ## Included preview
 
-The checked-in [29-second video](samples/cafe-a1.mp4) and [audio](samples/cafe-a1.mp3)
+The checked-in [31-second video](samples/cafe-a1.mp4) and [audio](samples/cafe-a1.mp3)
 contain all 12 turns, rendered with Piper. Local stream/duration checks and a full
 FFmpeg decode passed. English and German subtitles are also in `samples/`.
 
 ## Generate a sample on GitHub
 
 Open **Actions → German A1 podcast** and open the latest successful run. Download
-**german-a1-cafe**, unzip it, and play `podcast.mp4` or `podcast.mp3`. Relevant pull requests generate four turns. After merging, **Run workflow**
+**german-a1-cafe**, unzip it, and play `podcast.mp4` or `podcast.mp3`. Relevant commits on `main` and pull requests generate four turns. After merging, **Run workflow**
 lets you uncheck **sample** to render all 12 turns. Artifacts expire after 30 days.
 A failed voice-service request fails the job; it never substitutes silent audio.
 
@@ -30,13 +39,14 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python -m unittest discover -s tests -v
 python scripts/render_episode.py --sample
+# Optional override: python scripts/render_episode.py --speed 0.90
 python scripts/verify_output.py output/cafe
 ```
 
 Remove `--sample` for the complete episode. Output: MP4 video, MP3 audio, WAV
 master, separate German/English SRT subtitles, episode JSON, and a word-level
 timeline JSON. The renderer uses 48 kHz mono audio, 24 fps video and 0.65-second
-turn-taking pauses. Speech is slowed down for beginners.
+turn-taking pauses. Speech plays at 0.90× the previous preview, with pitch preserved.
 
 ## Voices and timing
 
@@ -55,7 +65,7 @@ Optional `--engine edge` uses `de-DE-ConradNeural` and `de-DE-KatjaNeural` throu
 [edge-tts](https://github.com/rany2/edge-tts). It provides word timestamps for
 karaoke highlighting and uses the episode's `rate` setting. Both local and GitHub
 runner tests returned HTTP 403 with this service; it is experimental and is not
-the default. No API keys are required. Piper uses a fixed 1.18 duration scale.
+the default. No API keys are required. Piper uses a fixed 1.18 synthesis duration scale; the episode’s `playback_speed` applies a further pitch-preserving 0.90× slowdown to either engine. Word timestamps are scaled with the audio.
 The workflow offers an engine selector for manual runs.
 
 Piper software is GPL-3.0; voice dataset licenses are CC0 according to their
