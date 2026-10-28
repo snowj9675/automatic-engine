@@ -11,8 +11,6 @@ on:
         type: choice
         options: [piper, edge]
         default: piper
-  push:
-    branches: ['feat/german-cafe-podcast']
   pull_request:
     paths: ['scripts/**', 'episodes/**', 'tests/**', 'requirements.txt', '.github/workflows/podcast.yml']
 permissions:

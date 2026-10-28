@@ -1,0 +1,47 @@
+1
+00:00:00,000 --> 00:00:03,042
+Hello, Anna! How are you?
+
+2
+00:00:03,042 --> 00:00:05,580
+Good, thanks! And you?
+
+3
+00:00:05,580 --> 00:00:08,227
+Good too. What would you like to drink?
+
+4
+00:00:08,227 --> 00:00:10,845
+I would like a tea, please.
+
+5
+00:00:10,845 --> 00:00:13,097
+With milk or without milk?
+
+6
+00:00:13,097 --> 00:00:14,691
+Without milk. And you?
+
+7
+00:00:14,691 --> 00:00:17,210
+I will have a coffee with milk.
+
+8
+00:00:17,210 --> 00:00:19,860
+Would you also like a cake?
+
+9
+00:00:19,860 --> 00:00:22,681
+Yes, please. I am hungry.
+
+10
+00:00:22,681 --> 00:00:25,315
+Me too. The cake is good!
+
+11
+00:00:25,315 --> 00:00:27,231
+Is your tea hot?
+
+12
+00:00:27,231 --> 00:00:29,209
+Yes. I will wait a little longer.

@@ -5,11 +5,16 @@ Anna on the right. Only the current speaker's bubble appears, with optional word
 highlighting when using the Edge engine. English translations stay
 in a separate bottom band. The illustration itself is static (no lip sync).
 
-## Watch a sample on GitHub
+## Included preview
+
+The checked-in [29-second video](samples/cafe-a1.mp4) and [audio](samples/cafe-a1.mp3)
+contain all 12 turns, rendered with Piper. Local stream/duration checks and a full
+FFmpeg decode passed. English and German subtitles are also in `samples/`.
+
+## Generate a sample on GitHub
 
 Open **Actions → German A1 podcast** and open the latest successful run. Download
-**german-a1-cafe**, unzip it, and play `podcast.mp4` or `podcast.mp3`. Branch pushes
-and relevant pull requests generate four turns. After merging, **Run workflow**
+**german-a1-cafe**, unzip it, and play `podcast.mp4` or `podcast.mp3`. Relevant pull requests generate four turns. After merging, **Run workflow**
 lets you uncheck **sample** to render all 12 turns. Artifacts expire after 30 days.
 A failed voice-service request fails the job; it never substitutes silent audio.
 
