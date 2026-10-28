@@ -1,0 +1,51 @@
+name: German A1 podcast
+on:
+  workflow_dispatch:
+    inputs:
+      sample:
+        description: Render only the first four turns
+        type: boolean
+        default: true
+  push:
+    branches: ['feat/german-cafe-podcast']
+  pull_request:
+    paths: ['scripts/**', 'episodes/**', 'tests/**', 'requirements.txt', '.github/workflows/podcast.yml']
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install video and font tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-dejavu-core
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Generate real audio and video
+        env:
+          FULL: ${{ github.event_name == 'workflow_dispatch' && inputs.sample == false }}
+        run: |
+          if [ "$FULL" = true ]; then
+            python scripts/render_episode.py
+          else
+            python scripts/render_episode.py --sample
+          fi
+      - name: Verify generated media
+        run: python scripts/verify_output.py output/cafe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: german-a1-cafe
+          path: |
+            output/cafe/podcast.mp4
+            output/cafe/podcast.mp3
+            output/cafe/german.srt
+            output/cafe/translation.srt
+            output/cafe/timeline.json
+            output/cafe/episode.json
+          if-no-files-found: error
+          retention-days: 30
