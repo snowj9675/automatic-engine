@@ -19,7 +19,7 @@ def publish(folder,env=None):
     if not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*',slug):raise ValueError('Invalid publication id.')
     # The allowlist prevents bucket configuration or credentials from entering the index.
     fields=('episode_id','source_revision','build_id','duration_seconds','published_at',
-            'video_url','audio_url','thumbnail_url','manifest_url')
+            'video_url','audio_url','thumbnail_url','manifest_url','public_verified')
     public={key:item[key] for key in fields}
     body=(json.dumps(public,indent=2)+'\n').encode()
     repo=env['GITHUB_REPOSITORY']

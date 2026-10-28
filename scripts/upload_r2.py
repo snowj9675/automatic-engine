@@ -40,16 +40,23 @@ def settings(env):
 
 
 def check_public_video(url, expected_size):
+    headers={'User-Agent':'Mozilla/5.0 (compatible; GermanLessonDelivery/1.0)'}
     for attempt in range(3):
-        try:
-            with urlopen(Request(url,method='HEAD'),timeout=20) as response:
-                if int(response.headers.get('Content-Length','0'))!=expected_size:
-                    raise ValueError('Public video size differs from uploaded file.')
-                if response.status!=200:raise ValueError('Public video is not readable.')
-            return
-        except Exception:
-            if attempt==2:raise RuntimeError('R2 transfer succeeded but the public video check failed. Check PUBLIC_URL and bucket public access.') from None
-            time.sleep(attempt+1)
+        for method in ('HEAD','GET'):
+            request_headers=dict(headers)
+            if method=='GET':request_headers['Range']='bytes=0-0'
+            try:
+                with urlopen(Request(url,method=method,headers=request_headers),timeout=20) as response:
+                    content_range=response.headers.get('Content-Range')
+                    size=content_range.rsplit('/',1)[-1] if content_range else response.headers.get('Content-Length','0')
+                    if int(size)!=expected_size or response.status not in (200,206):
+                        raise ValueError('Public video size or status differs from the uploaded file.')
+                    if method=='GET':response.read(1)
+                return
+            except Exception:
+                pass
+        if attempt<2:time.sleep(attempt+1)
+    raise RuntimeError('R2 transfer succeeded but public video access failed. Check PUBLIC_URL and bucket public access.')
 
 
 def upload(folder,env=None,client=None):
@@ -99,7 +106,7 @@ def upload(folder,env=None,client=None):
         report['video_url']=f'{public}/{prefix}/podcast.mp4'
         check_public_video(report['video_url'],(folder/'podcast.mp4').stat().st_size)
         publication={'episode_id':slug,'source_revision':revision,'build_id':build_id,
-                     'duration_seconds':manifest['duration_seconds'],
+                     'duration_seconds':manifest['duration_seconds'],'public_verified':True,
                      'published_at':datetime.now(timezone.utc).isoformat(),
                      'video_url':report['video_url'],'audio_url':f'{public}/{prefix}/podcast.mp3',
                      'thumbnail_url':f'{public}/{prefix}/thumbnail.png','manifest_url':f'{public}/{prefix}/manifest.json'}

@@ -10,7 +10,7 @@ sys.path.insert(0,str(ROOT/'scripts'))
 from discover_episodes import select
 from markdown_episode import read_markdown
 from episode_package import load_package
-from upload_r2 import settings, upload
+from upload_r2 import settings, upload, check_public_video
 from test_production import FakeStorage
 
 
@@ -96,5 +96,20 @@ class NewSecretsTests(unittest.TestCase):
             self.assertNotIn('test-secret',public);self.assertNotIn('test-key',public)
             self.assertIn('https://public.example.com/episodes/test/',public)
 
+
+
+class PublicAccessTests(unittest.TestCase):
+    def test_browser_agent_and_range_fallback(self):
+        from unittest.mock import MagicMock
+        from urllib.error import HTTPError
+        response=MagicMock()
+        response.__enter__.return_value=response
+        response.status=206
+        response.headers={'Content-Length':'1','Content-Range':'bytes 0-0/1234'}
+        with patch('upload_r2.urlopen',side_effect=[HTTPError('https://example.com/video',405,'HEAD unsupported',{},None),response]) as open_url:
+            check_public_video('https://example.com/video',1234)
+            requests=[call.args[0] for call in open_url.call_args_list]
+            self.assertIn('Mozilla/5.0',requests[0].get_header('User-agent'))
+            self.assertEqual(requests[1].get_header('Range'),'bytes=0-0')
 
 if __name__=='__main__':unittest.main()
