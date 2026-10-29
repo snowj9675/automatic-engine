@@ -1,0 +1,13 @@
+{
+  "episode_id": "podcast-morgen-a1-preview",
+  "source_revision": "94c75110cb65bf6c1fe932a68d0734468be02461",
+  "build_id": "40838143925-1",
+  "duration_seconds": 43.368,
+  "published_at": "2026-10-29T07:53:22.552220+00:00",
+  "video_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/previews/podcast-morgen-a1-preview/94c75110cb65bf6c1fe932a68d0734468be02461/40838143925-1/podcast.mp4",
+  "audio_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/previews/podcast-morgen-a1-preview/94c75110cb65bf6c1fe932a68d0734468be02461/40838143925-1/podcast.mp3",
+  "thumbnail_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/previews/podcast-morgen-a1-preview/94c75110cb65bf6c1fe932a68d0734468be02461/40838143925-1/thumbnail.png",
+  "manifest_url": "https://pub-7f1d64fab8414f9ebcfa934ff6e6c9e8.r2.dev/previews/podcast-morgen-a1-preview/94c75110cb65bf6c1fe932a68d0734468be02461/40838143925-1/manifest.json",
+  "public_verified": true,
+  "preview": true
+}
