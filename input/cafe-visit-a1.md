@@ -3,7 +3,7 @@ id: cafe-visit-a1
 title: Ein Vormittag im Café
 display_title: Im Café
 level: A1
-image_ready: true
+image_ready: false
 image: ../images/cafe_two_people.png
 left_name: Ben
 right_name: Anna

@@ -21,6 +21,7 @@ def publish(folder,env=None):
     fields=('episode_id','source_revision','build_id','duration_seconds','published_at',
             'video_url','audio_url','thumbnail_url','manifest_url','public_verified')
     public={key:item[key] for key in fields}
+    if 'preview' in item:public['preview']=item['preview']
     body=(json.dumps(public,indent=2)+'\n').encode()
     repo=env['GITHUB_REPOSITORY']
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+',repo):raise ValueError('Invalid repository.')

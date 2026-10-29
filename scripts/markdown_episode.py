@@ -18,12 +18,17 @@ def read_markdown(path):
         raise ValueError('Markdown lessons need YAML settings between --- lines at the top.')
     metadata=yaml.safe_load(match[1])
     if not isinstance(metadata,dict):raise ValueError('Markdown settings must be a mapping.')
+    metadata.setdefault('image_ready',True)
+    metadata.setdefault('image','../img/podcast.png')
+    if 'preview' in metadata and type(metadata['preview']) is not bool:
+        raise ValueError('preview must be true or false without quotes.')
     if type(metadata.get('image_ready')) is not bool:
         raise ValueError('Set image_ready to true or false (without quotation marks).')
     if 'strict_duration' in metadata and type(metadata['strict_duration']) is not bool:
         raise ValueError('strict_duration must be true or false without quotes.')
     data={**metadata,'ready':metadata['image_ready']}
     data.setdefault('translation_language','English')
+    data.setdefault('subtitle_style','light')
     data.setdefault('rate','+0%')
     data.setdefault('playback_speed',.9)
     data.setdefault('pause_seconds',.8)

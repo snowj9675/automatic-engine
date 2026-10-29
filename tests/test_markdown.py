@@ -52,6 +52,15 @@ Use the same characters.
         self.assertEqual(select(self.root,['input/cafe-test.md'])[0]['episode'],'input/cafe-test.md')
         self.assertEqual(len(select(self.root,['images/cafe.png'])),1)
 
+    def test_shared_podcast_scene_needs_no_episode_image_flags(self):
+        (self.root/'img').mkdir()
+        (self.root/'img/podcast.png').write_bytes(b'shared scene')
+        self.path.write_text(self.text.replace('image_ready: true\n','').replace('image: ../images/cafe.png\n',''))
+        data,image=load_package(self.path,self.root)
+        self.assertTrue(data['ready'])
+        self.assertEqual(image,self.root/'img/podcast.png')
+        self.assertEqual(len(select(self.root,['img/podcast.png'])),1)
+
     def test_image_false_waits_without_requiring_file(self):
         self.path.write_text(self.text.replace('image_ready: true','image_ready: false'))
         (self.root/'images/cafe.png').unlink()

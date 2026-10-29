@@ -101,6 +101,17 @@ class UploadTests(unittest.TestCase):
         with self.assertRaises(ValueError):upload(self.folder,self.env,storage)
         self.assertEqual(storage.keys,[])
 
+    def test_explicit_one_minute_preview_uses_separate_prefix(self):
+        self.manifest.update(preview=True,duration_seconds=55)
+        self.save();storage=FakeStorage()
+        report=upload(self.folder,self.env,storage)
+        self.assertTrue(report['prefix'].startswith('previews/test-episode/'))
+        self.manifest['duration_seconds']=61
+        self.save();storage=FakeStorage()
+        with self.assertRaisesRegex(ValueError,'60 seconds'):
+            upload(self.folder,self.env,storage)
+        self.assertEqual(storage.keys,[])
+
     def test_sample_is_never_published(self):
         self.manifest['sample']=True;self.save();storage=FakeStorage()
         self.assertIsNone(upload(self.folder,self.env,storage));self.assertEqual(storage.keys,[])

@@ -108,7 +108,7 @@ jobs:
         id: speech_cache
         with:
           path: output/${{ matrix.slug }}/cache
-          key: speech-${{ runner.os }}-${{ matrix.slug }}-${{ hashFiles('scripts/render_episode.py') }}-${{ github.sha }}
+          key: speech-${{ runner.os }}-${{ matrix.slug }}-${{ hashFiles('scripts/render_episode.py') }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
             speech-${{ runner.os }}-${{ matrix.slug }}-${{ hashFiles('scripts/render_episode.py') }}-
             speech-${{ runner.os }}-${{ matrix.slug }}-

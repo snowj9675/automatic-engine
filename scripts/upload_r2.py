@@ -72,6 +72,11 @@ def upload(folder,env=None,client=None):
     if manifest.get('sample'):
         print('Skipping R2 upload for a short preview; only complete episodes are published.')
         return None
+    preview=manifest.get('preview',False)
+    if type(preview) is not bool:
+        raise ValueError('Manifest preview must be a boolean.')
+    if preview and not 0<manifest.get('duration_seconds',0)<=60:
+        raise ValueError('Only verified previews up to 60 seconds may be published as previews.')
     build_id=manifest.get('build_id','')
     if not re.fullmatch(r'(?:[0-9]+-[0-9]+|[a-f0-9]{16})',build_id):
         raise ValueError('R2 publication requires a valid build id.')
@@ -89,7 +94,8 @@ def upload(folder,env=None,client=None):
                             aws_access_key_id=config['R2_ACCESS_KEY_ID'],aws_secret_access_key=config['R2_SECRET_ACCESS_KEY'],
                             region_name='auto',config=Config(request_checksum_calculation='when_required',response_checksum_validation='when_required'))
     bucket=config['R2_BUCKET_NAME']
-    prefix=f'episodes/{slug}/{revision}/{build_id}'
+    category='previews' if preview else 'episodes'
+    prefix=f'{category}/{slug}/{revision}/{build_id}'
     # Completion marker goes last; partial failures never announce a completed episode.
     entries.append({'name':'manifest.json','content_type':'application/json'})
     for item in entries:
@@ -106,7 +112,7 @@ def upload(folder,env=None,client=None):
         report['video_url']=f'{public}/{prefix}/podcast.mp4'
         check_public_video(report['video_url'],(folder/'podcast.mp4').stat().st_size)
         publication={'episode_id':slug,'source_revision':revision,'build_id':build_id,
-                     'duration_seconds':manifest['duration_seconds'],'public_verified':True,
+                     'duration_seconds':manifest['duration_seconds'],'preview':preview,'public_verified':True,
                      'published_at':datetime.now(timezone.utc).isoformat(),
                      'video_url':report['video_url'],'audio_url':f'{public}/{prefix}/podcast.mp3',
                      'thumbnail_url':f'{public}/{prefix}/thumbnail.png','manifest_url':f'{public}/{prefix}/manifest.json'}

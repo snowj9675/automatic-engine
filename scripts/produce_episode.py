@@ -58,9 +58,12 @@ async def produce(path, sample=False, engine='auto'):
     thumbnail(data,image,path.parent,output/'thumbnail.png')
     timeline=json.loads((output/'timeline.json').read_text())
     duration=timeline[-1]['end']
+    preview=data.get('preview',False)
+    if preview and duration>60:
+        raise ValueError('Podcast previews must be at most 60 seconds. Shorten the preview dialogue.')
     target=data.get('target_duration_seconds')
     on_target=None if not target or sample else target[0] <= duration <= target[1]
-    report={'id':data['id'],'sample':sample,'duration_seconds':round(duration,3),
+    report={'id':data['id'],'sample':sample,'preview':preview,'duration_seconds':round(duration,3),
             'target_duration_seconds':target,'within_target':on_target,
             'note':'Duration is measured from generated speech. No artificial padding or repeated dialogue is added.'}
     if on_target is False:
@@ -69,7 +72,7 @@ async def produce(path, sample=False, engine='auto'):
     if on_target is False and data.get('strict_duration') is True:
         raise ValueError('Episode is outside the required duration range. See production-report.json.')
     revision=os.getenv('GITHUB_SHA') or 'local'
-    manifest={'id':data['id'],'revision':revision,'sample':sample,'duration_seconds':duration,'files':[]}
+    manifest={'id':data['id'],'revision':revision,'sample':sample,'preview':preview,'duration_seconds':duration,'files':[]}
     for name in files:
         item=output/name
         manifest['files'].append({'name':name,'size':item.stat().st_size,

@@ -1,145 +1,101 @@
-# One Markdown file per German lesson
+# Shared-scene podcast production
 
-The input format is now **one `.md` file**, with YAML settings at the top and a
-German/English dialogue table below. JSON files and manifests are compiled
-internally into the runner's output folder; you do not maintain them by hand.
-Finished videos go to R2. **GitHub artifact uploads are disabled.**
+## One Markdown file per transcript
 
-## The normal process
-
-1. Ask for a complete A1/A2 Markdown lesson. Save it as `input/<id>.md`, with the
-   same `id` in its top settings. A draft template is in `input/_template.md`.
-2. Read its scene prompt and generate the image. Upload that image into `images/`
-   and set `image` to its relative path, e.g. `../images/kitchen.png`.
-3. Keep `image_ready: false` while the image is missing. The workflow will wait.
-4. Set `image_ready: true` and commit. The workflow validates the image and script,
-   generates the entire video, verifies it, uploads it to R2 and checks public access.
-5. Open `published/<id>.json` for the public video, audio, thumbnail and manifest
-   links. These index files contain only intended-public delivery metadata.
-
-The real long café lesson is `input/cafe-visit-a1.md`, using the existing image at
-`images/cafe_two_people.png`. It has original continuous dialogue, not repeated
-sample loops. The older folder/JSON format remains readable for compatibility,
-but input examples now use Markdown exclusively.
-
-## Settings example
+Every transcript defaults to `img/podcast.png`. Write only a Markdown file in
+`input/`; no separate episode JSON, scene upload or image prompt is necessary.
+The renderer automatically compiles internal files and fits the image without
+distortion. New transcripts are ready by default; `image_ready: false` holds a draft.
+An explicit legacy `image:` path is still supported.
 
 ```yaml
 ---
-id: cafe-visit-a1
-title: Ein Vormittag im Café
-display_title: Im Café
+id: mein-tag-a1
+title: Mein Tag
 level: A1
-image_ready: true
-image: ../images/cafe_two_people.png
-left_name: Ben
-right_name: Anna
-translation_language: English
 playback_speed: 0.90
 pause_seconds: 0.85
+rate: +0%
+karaoke: false
 target_duration_seconds: [480, 600]
 strict_duration: true
-thumbnail_title: Im Café · Deutsch A1
 ---
 ```
 
-`image_ready` must be a Boolean, without quotation marks. True requires an existing
-image inside the repository; false skips rendering and publication. Images are
-not generated automatically. Paths are relative to the Markdown file. For an
-optional finished cover, add `thumbnail: ../images/cafe-cover.png`; otherwise a
-cover is made from the background and thumbnail_title.
+Add `## Dialogue` with a `Speaker | German | English` table. Use Ben and Anna,
+or set `left_name` and `right_name`. The default pair is FlorianMultilingual
+(left) and SeraphinaMultilingual (right), German (Germany), through Edge TTS.
+Native rate implements the requested speed once; there is no second slowdown.
 
-`strict_duration: true` stops publication if measured duration is outside the
-specified range. The pipeline never pads silence or repeats dialogue to force a
-length. Revise the script or pacing if a draft misses its target. Its duration
-report remains available on the runner for diagnosis.
+## Preview first
 
-## Dialogue
+For a short review, use a distinct id such as `podcast-morgen-a1-preview`, add
+`preview: true`, set `target_duration_seconds: [35, 60]`, and write a short excerpt.
+Both rendering and publication reject previews longer than 60 seconds. Preview
+media is stored under `previews/`, full episodes under `episodes/`. The current
+sample does not generate or publish any eight-to-ten-minute production episode.
 
-Use this exact section title and a three-column table:
+The old CLI/Actions `sample` option is a four-turn internal check and is not
+published. Pull-request runs also remain unpublished.
 
-```markdown
-## Dialogue
+## A1 editorial approach
 
-| Speaker | German | English |
-|---|---|---|
-| Ben | Ich möchte einen Kaffee. | I would like a coffee. |
-| Anna | Mit Milch oder ohne Milch? | With milk or without milk? |
-```
+Use familiar topics: morning routines, food, shopping, family, home and free time.
+Build a longer podcast as a conversation with small connected subtopics, short
+questions and personal answers, and useful natural repetition. Use present tense,
+common separable verbs and basic ordering phrases. Avoid subordinate-clause-heavy
+explanations, idioms and abstract discussion. Exactly two voices, no third narrator.
+A1 captions allow at most 12 German words; A2 allows 18. Review vocabulary,
+grammar and translations manually; structural limits cannot certify CEFR level.
 
-Speaker names must match the two names in the settings. Default voices are
-Thorsten (left, Piper) and Eva (right, Silero). Optional explicit `speakers`
-settings can override voice/position details for advanced use. Keep each A1
-caption to 12 German words, A2 to 18. These are layout limits, not automatic CEFR
-certification. Grammar, vocabulary, translation and pronunciation still need
-editorial/listening review.
+For production, aim at 480–600 seconds and measure the rendered result. Revise
+content if it falls outside the range, rather than padding with silence or looping.
+The full episode will be authored after the one-minute sample is reviewed.
 
-Put scene ideas under `## Image prompt` and cover ideas under `## Thumbnail
-prompt`. Other prose sections are authoring notes; they are not executable
-pipeline instructions. The complete Markdown source is included with R2 output.
+## GitHub Actions and R2
 
-## Your GitHub Actions secrets
+Commit ready Markdown transcripts to main. A changed shared image rebuilds ready
+transcripts that use it; shared renderer changes rebuild all ready transcripts.
+Only the current preview is ready during this trial. The old café lesson is a draft
+because its former illustration was removed.
 
-The workflow accepts these exact names:
+Configure these GitHub Actions secrets:
 
-| Secret | Expected value |
+| Secret | Value |
 |---|---|
-| `ACCESS_KEY_ID` | Cloudflare R2 S3 access key id |
-| `SECRET_ACCESS_KEY` | R2 S3 secret access key |
-| `BUCKET_NAME` | Existing bucket name |
-| `S3_API` | HTTPS R2 S3 endpoint; an optional trailing `/bucket-name` is accepted |
-| `PUBLIC_URL` | HTTPS public bucket/domain base URL, e.g. your `r2.dev` address |
+| ACCESS_KEY_ID | R2 S3 access key id |
+| SECRET_ACCESS_KEY | R2 S3 secret key |
+| BUCKET_NAME | Destination bucket |
+| S3_API | HTTPS R2 account S3 endpoint |
+| PUBLIC_URL | Public bucket/domain base URL |
 
-The S3 endpoint and public URL are different. The uploader uses S3_API for signed
-uploads, and PUBLIC_URL for viewer links. It never writes credentials into an
-episode, generated manifest or public index. Older R2-prefixed secret names are
-still accepted by the uploader for compatibility.
+Never put credentials in Markdown or public files. The pipeline uses the existing
+secrets, verifies local manifests and uploaded object sizes, then checks the public
+video URL before announcing success. GitHub output artifacts are disabled.
 
-A complete main-branch run stores versioned objects under:
+Versioned media paths:
 
-`episodes/<episode-id>/<source-commit>/<run-id>-<attempt>/`
+- Full episode: `episodes/<id>/<commit>/<run-id>-<attempt>/`.
+- Review sample: `previews/<id>/<commit>/<run-id>-<attempt>/`.
 
-Video, MP3, thumbnail, subtitles, script and build metadata are uploaded. The
-manifest is written last. File sizes and public video access are checked before
-publishing the repository index. No artifact upload or automatic video commit
-is performed. Only the small public-link JSON is committed back to `published/`.
-The workflow token has contents-write permission for that operation. Its index
-commit does not trigger another render.
+Verified video/audio/thumbnail/manifest URLs and the preview flag are recorded in
+`published/<id>.json`. Completion manifests are uploaded last. Public access must
+work before the index is updated; publication failures are not reported as success.
 
-Pull requests and explicit four-turn samples do not publish. Missing/partial
-credentials or a broken public URL cause publication to fail; a successful render
-alone is not reported as a successful delivery. Generated files on GitHub runners
-are temporary, so fix configuration errors and rerun the job if needed.
+Speech caching uses text, exact voice, rate and library version. Completed turns
+are preserved even if a later turn fails. Each retry attempt has its own cache key,
+so it can save additional progress without overwriting an immutable cache.
 
-## Local tests and manual runs
+## Local checks
 
 ```bash
 pip install -r requirements.txt
 python -m unittest discover -s tests -v
 python scripts/discover_episodes.py
-python scripts/produce_episode.py --episode input/cafe-visit-a1.md
+python scripts/produce_episode.py --episode input/podcast-morgen-a1-preview.md
 ```
 
-A GitHub push of a changed ready Markdown file triggers a full render. Image
-changes rebuild lessons that reference the image. Shared source changes rebuild
-all ready lessons. Manual **Actions → German episode production → Run workflow**
-can target an episode id; blank selects all ready lessons. Explicit short samples
-are checks only and are not stored in R2. Voice models/speech are cached to speed
-reruns, including completed speech turns from a failed run. Transient Edge
-errors are retried with increasing delays; the voice is never silently replaced.
-Caches are internal build accelerators, not viewer download artifacts.
-
-## Layout and voices
-
-The video fills a 1280×720 scene. Simple white speech bubbles appear above the
-active character, with bold German text and bottom English subtitles. There is
-no top banner or sentence/speed display. This follows the supplied conversation
-reference; the earlier editorial frame and concept image are superseded.
-
-The default voices are Edge TTS `de-DE-FlorianMultilingualNeural` (left) and
-`de-DE-SeraphinaMultilingualNeural` (right). They need internet access, with no
-offline model download. `playback_speed: 0.90` and base `rate: +0%` request
-native -10% speech, without a second slowdown. `karaoke: false` preserves
-simple sentence bubbles; real word boundaries are still saved in the timeline.
-Optional older offline voices and their license details remain in the README. The pipeline can check intelligibility with the
-optional ASR audit, but does not promise flawless pronunciation for every script.
+Verification checks stream durations, clipping, sentence boundaries, non-silent
+turns and a complete FFmpeg decode. English translations stay at the bottom.
+Simple white German bubbles point to the active speaker. There is no top banner.
+Karaoke is optional and only enabled with reliable one-to-one word timestamps.

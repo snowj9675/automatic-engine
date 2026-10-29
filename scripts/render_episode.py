@@ -183,12 +183,14 @@ def draw_frame(background, data, line, active, dest):
             d.text((text_x,text_y),word,font=f,fill='#101010',anchor='lt')
             text_x+=f.getlength(word+' ')
         text_y+=line_height
-    # English stays at the bottom, with a soft contrast fade rather than a label bar.
-    overlay=Image.new('RGBA',(W,H))
-    od=ImageDraw.Draw(overlay)
-    for yy in range(H-108,H):
-        od.line((0,yy,W,yy),fill=(0,0,0,round(190*(yy-(H-108))/108)))
-    im=Image.alpha_composite(im.convert('RGBA'),overlay).convert('RGB')
+    # A light podcast illustration needs no dark band across its white background.
+    light_subtitles=data.get('subtitle_style')=='light'
+    if not light_subtitles:
+        overlay=Image.new('RGBA',(W,H))
+        od=ImageDraw.Draw(overlay)
+        for yy in range(H-108,H):
+            od.line((0,yy,W,yy),fill=(0,0,0,round(190*(yy-(H-108))/108)))
+        im=Image.alpha_composite(im.convert('RGBA'),overlay).convert('RGB')
     d=ImageDraw.Draw(im)
     tf=font(28)
     translated=layout(line['translation'],tf,W-64)
@@ -196,7 +198,7 @@ def draw_frame(background, data, line, active, dest):
     ty=H-16-34*len(translated)
     for row in translated:
         text=' '.join(word for _,word in row)
-        d.text(((W-tf.getlength(text))/2,ty),text,font=tf,fill='white',stroke_width=1,stroke_fill='#202020',anchor='lt')
+        d.text(((W-tf.getlength(text))/2,ty),text,font=tf,fill='#25426b' if light_subtitles else 'white',stroke_width=0 if light_subtitles else 1,stroke_fill='#202020',anchor='lt')
         ty+=34
     im.save(dest,quality=95,subsampling=0)
     with Image.open(dest) as check:check.load()
@@ -332,7 +334,9 @@ async def build(args):
     cache.mkdir(exist_ok=True)
     frames = out / 'frames'
     frames.mkdir(exist_ok=True)
-    background = Image.open(args.image).convert('RGB').resize((W,H), Image.Resampling.LANCZOS)
+    scene = ImageOps.contain(Image.open(args.image).convert('RGB'), (W,H), method=Image.Resampling.LANCZOS)
+    background = Image.new('RGB',(W,H),'#fafafa')
+    background.paste(scene,((W-scene.width)//2,(H-scene.height)//2))
     preview = frames/'layout-check.jpg'
     for line in data['lines']:
         draw_frame(background,data,line,-1,preview)
